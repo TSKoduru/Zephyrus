@@ -26,10 +26,23 @@ mission/setpoint publishers. For a stationary logging check use `enable_motion:=
 The mission waits for fresh odometry, flight state and recorded stereo mapping.
 A tracking/logging fault stops the mission and requests HOLD; pilot takes over.
 
-Logs: `~/team_ws/logs/odom_10cm/<run>/`, including raw rosbag, stereo/calibration,
-measured depth, and accumulated `snapshots/*_vo.ply` maps in the odometry frame.
-Empty `_pf.ply` files are recorder schema artifacts; no PF is running.
-Use Ctrl-C to flush logging after the test.
+Logs: `~/team_ws/logs/odom_10cm/<run>/`. The initial-test logger now writes **no
+rosbag and no NPZ**. It keeps:
+
+- `mission_transitions.jsonl`: stage changes, faults and gates; send this first.
+- `events.jsonl`: recent mission status, flight state, odometry and pose/twist commands.
+- `diagnostics.jsonl`: depth processing health, exposure times, calibration and poses.
+- `previews/`: at most 60 one-second preview sets: 320x200-or-smaller stereo JPEGs,
+  plus depth PNGs in millimetres (0 means invalid).
+- `snapshots/*_vo.ply`: latest two binary PLY maps, each limited to 50,000 voxels.
+- `manifest.json`, `storage_policy.json`, `configs/`: configuration and exact source copies.
+
+Each text log rotates at 4 MiB and keeps one backup (`.jsonl.1`). Preview retention
+is rolling; older observations are deliberately discarded. The accumulated map
+continues integrating at the normal processing rate, including between previews.
+This is compact diagnostic logging, not a full raw-sensor replay archive. Existing
+runs are untouched; total disk usage still grows when creating additional runs.
+Use Ctrl-C to flush logging after the test. This changes logging only, not flight behavior.
 RViz: fixed frame `odom`, PointCloud2 `/odom_test/observed_points`,
 Image `/odom_test/stereo_depth`. Status: `/odom_test/mission_status` and
 `/odom_test/map_status`.

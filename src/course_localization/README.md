@@ -1,5 +1,8 @@
 # Course localization and logging
 
+The organizer initial 10cm test uses bounded text/JPEG/PNG/PLY logging, with no NPZ or rosbag.
+See `docs/odom_10cm_test.md`. The full-course logger described below is separate.
+
 A team-workspace package that runs beside the existing OAK/cuVSLAM stack. The default localization launch publishes localization and diagnostic outputs only. An explicitly enabled, separate course follower is also available; it is bounded velocity feedback, not MPC. The localization node does not arm, command flight, publish to `/fmu/in/*`, replace cuVSLAM, or modify the flight interface. No map-override feature is included.
 
 For setup, startup, self-test, RViz and optional controller commands, see `docs/course_setup.md` in the repository.

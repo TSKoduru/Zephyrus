@@ -11,8 +11,7 @@ from sensor_msgs.msg import Image, PointCloud2, PointField
 from std_msgs.msg import Header, String
 
 from .inputs import Inputs
-from .raw_bag import RawBag
-from .recording import RunRecorder
+from .compact_recording import CompactRecorder
 from .sensor_geometry import pose_matrix
 
 DEFAULTS = {
@@ -23,7 +22,7 @@ DEFAULTS = {
     'body_frame': 'base_link', 'odom_frame': 'odom', 'update_hz': 5., 'stereo_slop_s': .003,
     'range_position_body_m': [0., 0., 0.], 'range_fov_deg': 1., 'range_variance_m2': .0005,
     'range_max_age_s': .1, 'px4_time_offset_s': 0.,
-    'log_root': '~/team_ws/logs/odom_10cm', 'record_raw_topics': True,
+    'log_root': '~/team_ws/logs/odom_10cm',
 }
 
 
@@ -55,22 +54,31 @@ class StereoMapLogger(Node):
         self.config = {k:self.declare_parameter(k,v).value for k,v in DEFAULTS.items()}
         if not 0 < self.config['update_hz'] <= 30:
             raise ValueError('update_hz must be in (0,30]')
-        self.recorder = RunRecorder(Path(self.config['log_root']).expanduser(), snapshot_every=10,
+        self.recorder = CompactRecorder(Path(self.config['log_root']).expanduser(),
             metadata={'parameters':self.config, 'purpose':'Stereo observations accumulated using cuVSLAM only',
                       'particle_filter_enabled':False, 'cloud_frame':self.config['odom_frame'],
                       'alignment':'Identity from odometry to output frame; no prior map',
-                      'pf_cloud_note':'Recorder schema may emit empty pf snapshots; use vo snapshots only'},
-            config_paths={'stereo_map_node.py':Path(__file__)},
+                      'storage':'Bounded text, JPEG/depth PNG previews and PLY maps; no NPZ or rosbag'},
+            config_paths={name:Path(__file__).with_name(name) for name in
+                          ('stereo_map_node.py','compact_recording.py','odom_10cm_test.py')},
             map_identity={'source':'No nominal map', 'frame':self.config['odom_frame']})
-        self.bag = None
         try:
             self.inputs = OdometryInputs(self, SimpleNamespace(inertial=ImuCoverage()), self.config)
-            topics = [v for k,v in self.config.items() if k.endswith('_topic') and v]
-            topics += ['/tf','/tf_static','/visual_slam/status','/odom_test/mission_status',
-                       '/odom_test/map_status','/odom_test/stereo_depth','/odom_test/observed_points',
-                       '/skybeta/state','/skybeta/setpoint/pose','/skybeta/setpoint/twist',
-                       '/fmu/out/vehicle_attitude','/fmu/out/distance_sensor']
-            self.bag = RawBag(self.recorder.path, topics, self.config['record_raw_topics'])
+            from nav_msgs.msg import Odometry
+            from geometry_msgs.msg import PoseStamped, TwistStamped
+            from rosidl_runtime_py.convert import message_to_ordereddict
+            self.event_subscriptions = []
+            for topic, kind in [('/odom_test/mission_status', String), ('/skybeta/state', String),
+                                ('/odom_test/map_status', String),
+                                ('/skybeta/setpoint/pose', PoseStamped),
+                                ('/skybeta/setpoint/twist', TwistStamped),
+                                (self.config['odometry_topic'], Odometry)]:
+                def record(msg, topic=topic):
+                    value = json.loads(msg.data) if isinstance(msg, String) else message_to_ordereddict(msg)
+                    self.recorder.event(topic, value)
+                from rclpy.qos import qos_profile_sensor_data
+                qos = qos_profile_sensor_data if kind is Odometry else 10
+                self.event_subscriptions.append(self.create_subscription(kind, topic, record, qos))
         except Exception:
             self.recorder.close(); raise
         self.depth_pub = self.create_publisher(Image, '/odom_test/stereo_depth', 2)
@@ -90,7 +98,9 @@ class StereoMapLogger(Node):
             y,x = np.nonzero(np.isfinite(frame.depth_m) & (frame.depth_m > 0))
             camera = (np.c_[x,y,np.ones(len(x))] @ np.linalg.inv(frame.K).T) * frame.depth_m[y,x,None]
             points = camera @ frame.T_body_camera[:3,:3].T + frame.T_body_camera[:3,3]
-            arrays = dict(raw, timestamp=frame.timestamp, depth_m=frame.depth_m, K=frame.K,
+            arrays = dict({k:v for k,v in raw.items() if k not in
+                          ('left_image','right_image','imu_samples','odom_samples','range_samples')},
+                          timestamp=frame.timestamp, depth_m=frame.depth_m, K=frame.K,
                           T_body_camera=frame.T_body_camera, odom_position=position,
                           odom_quaternion_xyzw=quaternion, T_odom_body=transform,
                           range_m=measurement.range_m, range_valid=measurement.valid)
@@ -119,14 +129,14 @@ class StereoMapLogger(Node):
     def status(self):
         self.status_pub.publish(String(data=json.dumps(dict(ready=(self.frames > 0 and self.last_time is not None
             and time.monotonic()-self.last_time < 2 and not self.last_error
-            and not self.recorder.health.get('error') and self.bag.health().get('running',False)),
+            and not self.recorder.health.get('error')
+            and not self.recorder.events.error and not self.recorder.transitions.error),
             frames=self.frames,last_error=self.last_error,
             seconds_since_frame=None if self.last_time is None else time.monotonic()-self.last_time,
-            log_directory=str(self.recorder.path),recorder=self.recorder.health,raw_bag=self.bag.health(),
+            log_directory=str(self.recorder.path),recorder=self.recorder.health,storage='compact; no rosbag or NPZ',
             particle_filter_enabled=False,cloud_frame=self.config['odom_frame']))))
 
     def close(self):
-        if self.bag is not None:self.bag.close()
         self.recorder.close()
 
 
