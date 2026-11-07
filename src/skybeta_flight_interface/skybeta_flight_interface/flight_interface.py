@@ -438,6 +438,9 @@ class FlightInterface(Node):
     def hold_cb(self, request, response):
         """Freeze at the last position considered safe."""
         del request
+        current = self._current_local_ned()
+        if current is not None:
+            self.hold_position_ned = current
         self.frozen = True
         self.mode = 'hold'
         self.target_velocity_ned = None
@@ -529,6 +532,9 @@ class FlightInterface(Node):
         age = self.now_s() - self.last_setpoint_time
         if age < self.setpoint_timeout_s:
             return
+        current = self._current_local_ned()
+        if current is not None:
+            self.hold_position_ned = current
         self.mode = 'hold'
         self.target_velocity_ned = None
         if not self._expiry_logged:

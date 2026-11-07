@@ -10,6 +10,7 @@
   <maintainer email="kelvindinhnguyen@gmail.com">kelvin</maintainer>
   <license>Apache-2.0</license>
 
+  <exec_depend>course_localization</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>

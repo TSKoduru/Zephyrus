@@ -1,19 +1,6 @@
-"""Launch the flight interface plus the example competitor node.
-
-This is what ``run_full_stack.sh`` starts in its ``competitor`` tmux window.
-Fork it: keep the ``flight_interface`` node exactly as it is (it owns the
-offboard heartbeat and the safety envelope) and swap ``square_mission`` for
-your own.
-
-    ros2 launch competitor_example competitor.launch.py
-    ros2 launch competitor_example competitor.launch.py \
-        max_altitude_m:=2.0 square_side_m:=3.0
-
-Set ``competitor:=false`` to bring up only the flight interface, e.g. to fly
-setpoints by hand from ``ros2 topic pub``.
-"""
+"""DEFAULT: odometry-only UP35cm, FORWARD10cm, DOWN; stereo map recorded."""
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -35,12 +22,8 @@ ARGUMENTS = [
      'stays in Position under the pilot'),
     ('odometry_topic', '/visual_slam/tracking/odometry',
      'source of the ENU pose the altitude band is measured against'),
-    ('hover_altitude_m', '1.5', 'example: hover height, metres'),
-    ('hover_seconds', '5.0', 'example: seconds to hold the hover'),
-    ('square_side_m', '5.0', 'example: side of the square, metres'),
-    ('arrival_radius_m', '0.3',
-     'example: how close counts as reaching a corner, metres'),
-    ('competitor', 'true', 'also start the example node'),
+    ('enable_motion', 'true', 'Initial 10cm test; false records only'),
+    ('competitor', 'true', 'Start initial odometry test and stereo recorder'),
 ]
 
 
@@ -67,19 +50,11 @@ def generate_launch_description():
         }],
     )
 
-    competitor = Node(
-        package='competitor_example',
-        executable='square_mission',
-        name='competitor_example',
-        output='screen',
-        emulate_tty=True,
-        condition=IfCondition(LaunchConfiguration('competitor')),
-        parameters=[{
-            'hover_altitude_m': LaunchConfiguration('hover_altitude_m'),
-            'hover_seconds': LaunchConfiguration('hover_seconds'),
-            'square_side_m': LaunchConfiguration('square_side_m'),
-            'arrival_radius_m': LaunchConfiguration('arrival_radius_m'),
-        }],
-    )
-
-    return LaunchDescription(declared + [flight_interface, competitor])
+    recorder = Node(package='course_localization', executable='stereo_map_only',
+                    output='screen', condition=IfCondition(LaunchConfiguration('competitor')))
+    mission = Node(package='course_localization', executable='odom_10cm_test',
+                   output='screen', condition=IfCondition(LaunchConfiguration('competitor')),
+                   parameters=[{'enable_motion': LaunchConfiguration('enable_motion')}])
+    return LaunchDescription(declared + [
+        LogInfo(msg='INITIAL TEST: UP 35cm -> FORWARD 10cm -> DOWN. ODOMETRY ONLY; NO PF/MPC.'),
+        flight_interface, recorder, mission])

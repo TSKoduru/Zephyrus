@@ -1,3 +1,5 @@
+> **Initial test:** the organizer default now runs the [odometry-only 10 cm test](odom_10cm_test.md). The full-course instructions below are separate.
+
 # Course setup, startup, self-test and RViz
 
 This change adds a separate `course_localization` team package. It does not replace the OAK/cuVSLAM stack or change PX4 settings. You deploy the repository yourself. Start with localization/logging only; the optional course controller is disabled by default.

@@ -1,5 +1,10 @@
 # skybeta
 
+**CURRENT DEFAULT: UP 35 cm → FORWARD 10 cm → DOWN, odometry only, stereo map recorded.**
+Run `ros2 launch competitor_example competitor.launch.py`.
+See [initial test setup and logs](docs/odom_10cm_test.md) before running.
+
+
 A GPS-denied autonomy stack for a Jetson Orin Nano paired with a Pixhawk 6C, shipped as
 one container image. **Write your navigation code in `~/team_ws/src` on your drone**:
 everything below your setpoints is already built, measured and documented.
@@ -17,7 +22,7 @@ everything below your setpoints is already built, measured and documented.
 
 ## Course localization additions
 
-See [course setup, self-test and RViz](docs/course_setup.md) for the optional team-workspace particle filter, detailed logging and explicitly enabled feedback follower. The default launch is localization/logging only; the follower is not MPC.
+See [course setup, self-test and RViz](docs/course_setup.md) for the optional team-workspace particle filter, detailed logging and explicitly enabled feedback follower. The separate `course.launch.py` launch is localization/logging only; the follower is not MPC.
 
 ## Rules
 
