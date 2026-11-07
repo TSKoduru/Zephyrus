@@ -15,6 +15,10 @@ everything below your setpoints is already built, measured and documented.
 
 ---
 
+## Course localization additions
+
+See [course setup, self-test and RViz](docs/course_setup.md) for the optional team-workspace particle filter, detailed logging and explicitly enabled feedback follower. The default launch is localization/logging only; the follower is not MPC.
+
 ## Rules
 
 You have root on your drone. That is so you can work freely, not permission to do everything

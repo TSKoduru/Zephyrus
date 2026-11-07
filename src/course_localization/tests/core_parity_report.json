@@ -1,0 +1,77 @@
+{
+  "status": "passed",
+  "tests": 7,
+  "environments": [
+    "host Python3.14",
+    "CPU ROSimage Python3.12 NumPy1.26.4"
+  ],
+  "command": "COURSE_REFERENCE_ROOT=/path/to/simulation_reference python tests/test_core_parity.py",
+  "scope": "Fixed synthetic sensor-only input parity. No hardware, ROSadapter, livecamera, or deployment validation.",
+  "coverage": [
+    "Selected definition AST parity, except explicit optional FoV constructor hook",
+    "Bit-exact24-step PF poses/covariances/particles/weights with ToF, depth keyframes, emptydepth and rejectedmotion fallback",
+    "Bit-exact stationaryIMU calibration and yawintegration",
+    "Bit-exact fixedstereo image depth/calibration/diagnostics with image-only noise estimate",
+    "Portable dependency and invalidinput checks",
+    "Explicit1degree rangebeam configuration"
+  ],
+  "dependencies": [
+    "numpy",
+    "scipy",
+    "opencv-python (cv2)",
+    "trimesh"
+  ],
+  "changes": [
+    "Removed simulator range generation and depth rendering",
+    "Removed perturbation functions and all experimental filter variants",
+    "Split active IMU integration into imu.py; public imports preserved",
+    "Added FloorRangeLikelihood(full_fov_deg=27.0); default numerics preserved,1degree hardwarebeam configurable"
+  ],
+  "retention_limit": "InertialAid times/quaternions/gaps grow withoutbound; adapter must trim while retaining brackets for pending exposure intervals. Core integration behavior unchanged.",
+  "core_files": {
+    "range_sensor.py": {
+      "sha256": "31f8dc30dbc1ef112b7bb3bb36d0bf2d5fa1b6810a3d717cd83190892f278e3b",
+      "lines": 115
+    },
+    "image_noise_estimation.py": {
+      "sha256": "6029ff7a9a7861df9db19dc393dcb4fda022958594fda545ff31280384191bc8",
+      "lines": 18
+    },
+    "particle_filter.py": {
+      "sha256": "f59539b8e758f34331c610186a9dc063191bb9c5db46762427c475568597337a",
+      "lines": 218
+    },
+    "occupancy_prior.py": {
+      "sha256": "a807445d34fb30134365396db3b9d3d631e9bbd3ab5c95cc7d6404abcfeb890a",
+      "lines": 105
+    },
+    "__init__.py": {
+      "sha256": "5f3911bc314dba430078629596a187eda62cb06d9e556568d8a909024af72dc5",
+      "lines": 1
+    },
+    "stereo_depth.py": {
+      "sha256": "35f71f3eb16132d235ef5e03452ba5c2ac679e7f70c327fd5b1154e6614c0a24",
+      "lines": 143
+    },
+    "inertial_aid.py": {
+      "sha256": "e2fbbdcf48620c73c7a323fc43546901522dfbd3a8570f5e7367f953c414fb95",
+      "lines": 108
+    },
+    "depth_sensor.py": {
+      "sha256": "06bc390510385e4febb7ef8d02a5f51c472f9ea6f358dba8dd6d71cc6256ef5d",
+      "lines": 20
+    },
+    "course_map.py": {
+      "sha256": "f3f299731de8efa6d441ba6a1a3f269707f181b9c61a4ca72a2a04d002c9447e",
+      "lines": 184
+    },
+    "imu.py": {
+      "sha256": "ff84b335e758d243309a5d6f5a90506c3cc5a4aa9bae378e00e7c232a9bb28e7",
+      "lines": 204
+    },
+    "motion_model.py": {
+      "sha256": "f99f4c0fca8c839dcb57efa059bf8557177d54522e71e70671dc08241df731ac",
+      "lines": 281
+    }
+  }
+}

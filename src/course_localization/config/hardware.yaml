@@ -1,0 +1,32 @@
+course_localization:
+  ros__parameters:
+    left_image_topic: /oak/left/image_mono
+    right_image_topic: /oak/right/image_mono
+    left_info_topic: /oak/left/camera_info
+    right_info_topic: /oak/right/camera_info
+    odometry_topic: /visual_slam/tracking/odometry
+    imu_topic: /oak/imu/data
+    # Either standard ROS Range or PX4 DistanceSensor may supply the downward reading.
+    # Missing/unexported/stale range is logged explicitly; no fabricated height.
+    range_topic: /course/downward_range
+    px4_range_topic: /fmu/out/distance_sensor
+    body_frame: base_link
+    map_frame: course_map
+    # Known launch prior in the packaged course map, metres and radians.
+    # Set these to the actual placement before interpreting map-aligned output.
+    initial_mean4: [-2.4146, 0.8144, 0.116, 0.872664626]
+    initial_std4: [0.25, 0.25, 0.08, 0.2617993878]
+    particle_seed: 42
+    update_hz: 5.0
+    stereo_slop_s: 0.003
+    # Hardware documentation says approximately 1 degree, unlike the sim's 27-degree cone.
+    # The zero offset is an explicit unmeasured mount approximation: enter measured FLU xyz.
+    range_position_body_m: [0.0, 0.0, 0.0]
+    range_fov_deg: 1.0
+    range_variance_m2: 0.0005
+    range_max_age_s: 0.10
+    # Leave zero for DDS timestamps already synchronized to ROS time.
+    # Boot-clock timestamps are rejected; set an independently verified offset if needed.
+    px4_time_offset_s: 0.0
+    log_root: ~/team_ws/logs/course
+    record_raw_topics: true
