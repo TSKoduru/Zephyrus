@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>skybeta_flight_interface</name>
+  <version>0.1.0</version>
+  <description>
+    The only node that talks to PX4 offboard: 10 Hz OffboardControlMode
+    heartbeat, ENU-&gt;NED setpoint conversion, altitude/speed clamp.
+    Never arms: the safety pilot does that on RC. With auto_offboard_on_arm it
+    requests Offboard once, when the pilot arms and then switches to Position.
+  </description>
+  <maintainer email="kelvindinhnguyen@gmail.com">kelvin</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>px4_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

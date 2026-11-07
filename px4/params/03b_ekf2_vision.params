@@ -1,0 +1,37 @@
+# Onboard parameters for Vehicle 1
+#
+# STAGE 3b - EKF2 external-vision fusion. Needs a WORKING vision datastream.
+#
+# Not in the fleet flasher's default set: load it per drone, once that drone's stack
+# shows /fmu/in/vehicle_visual_odometry at ~30 Hz. The pose_frame fix it used to wait
+# on is done (px4_odom_bridge.py sends POSE_FRAME_FRD, bench-verified pose_frame=2):
+# with EKF2_EV_CTRL = 9, an FRD frame and no GNSS, EKF2 v1.16 resets its heading to
+# the vision yaw and fuses vision x/y in that frame (ev_yaw_control.cpp).
+# Loaded on drone 16 on 2026-11-03 with EKF2_EV_DELAY = 60 measured on that airframe
+# (fleet/drone16-vio-2026-11-03.params, CLAUDE.md "Drone 16").
+# Height is 03a's job alone. This file used to carry EKF2_HGT_REF = 0 and
+# EKF2_BARO_CTRL = 1 as well, which silently undid 03a's range reference.
+# EKF2_EV_CTRL = 9 is bit0 (horizontal position) + bit3 (yaw). Vertical position
+# (bit1 -> 11) and 3D velocity (bit2 -> 13) are deliberately left OFF until
+# vision altitude is trusted.
+# EKF2_EV_DELAY 70 ms is MEASURED on the bench Orin (2026-10-16, skybeta:0.2.0,
+# tools/latency_probe.py, 30 s): image -> bridge publish p50 68.7 ms, p95 102 ms
+# (driver leg 43 ms), plus ~1-2 ms for the serial hop. Same hardware should land
+# close; re-run the probe on each airframe and cross-check with EKF2 replay logs.
+# Gates stay at the baseline EKF2_EVP_GATE 5 / EKF2_EVV_GATE 3: wider gates let a
+# vision jump through into the position estimate.
+# EKF2_EV_POS_* stay 0: the camera lever arm is carried by the static TF in
+# oakd_vslam.launch.py. Setting both would apply the offset twice.
+# There is no optical flow on these airframes (08_no_optical_flow.params) and the
+# rangefinder stays the height reference (03a): VIO is the ONLY horizontal source.
+#
+# Vehicle-Id	Component-Id	Name	Value	Type
+1	1	EKF2_EV_CTRL	9	6
+1	1	EKF2_EV_DELAY	70.000000	9
+1	1	EKF2_EV_NOISE_MD	0	6
+1	1	EKF2_EVP_NOISE	0.100000	9
+1	1	EKF2_EVV_NOISE	0.100000	9
+1	1	EKF2_EVA_NOISE	0.050000	9
+1	1	EKF2_EV_POS_X	0.000000	9
+1	1	EKF2_EV_POS_Y	0.000000	9
+1	1	EKF2_EV_POS_Z	0.000000	9

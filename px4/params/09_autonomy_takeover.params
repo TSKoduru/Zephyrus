@@ -1,0 +1,24 @@
+# Onboard parameters for Vehicle 1
+#
+# STAGE 9 - FLEET POLICY: the pilot can take the vehicle back from autonomy with the sticks.
+# Independent of vision, UART and the container. Loads on every FC.
+#
+# The competition flow is: pilot arms, then switches to Position, the flight interface then
+# requests Offboard (auto_offboard_on_arm). So the mode switch is already on Position
+# while team code flies, and PX4 only acts on the switch when it CHANGES position
+# (manual_control: switches.mode_slot != _previous_switches.mode_slot). The switch can
+# still take over, by moving to Altitude or Manual, but not by staying where it is.
+#
+#   COM_RC_OVERRIDE 1 -> 3   bit 0 auto modes, bit 1 Offboard (commander_params.c, v1.16).
+#                            Moving a stick more than COM_RC_STICK_OV (30 %) switches
+#                            to Position, or Altitude if position is unavailable.
+#
+# Throttle counts as a stick. It sits low while autonomy flies, so raising it towards
+# centre takes over and leaves it where Position holds altitude. Flipping the mode
+# switch with the throttle still low commands a descent.
+#
+# Kept out of 00_baseline.params so tools/param_diff.py --make-baseline still
+# reproduces the baseline from the May-07 dump (same reasoning as 04-08).
+#
+# Vehicle-Id	Component-Id	Name	Value	Type
+1	1	COM_RC_OVERRIDE	3	6

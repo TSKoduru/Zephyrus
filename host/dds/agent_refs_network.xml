@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  skybeta: the MicroXRCEAgent's DDS participant for PX4, on every interface.
+
+  Used when SKYBETA_DDS_SCOPE=network (debugging from a laptop). Same contract
+  as agent_refs_local.xml: the FC sets UXRCE_DDS_PTCFG=2 and the agent builds
+  the "px4_participant" profile from this file. Fast DDS built-in transports,
+  so /fmu/* is visible to any host on the same ROS_DOMAIN_ID. Bench: discovered
+  by a ROS node in 0.2 s, DDS traffic on WiFi as expected.
+-->
+<dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <profiles>
+    <participant profile_name="px4_participant">
+      <rtps>
+        <name>px4_micro_xrce_dds</name>
+      </rtps>
+    </participant>
+  </profiles>
+</dds>

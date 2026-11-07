@@ -1,0 +1,273 @@
+SKYBETA COMPETITOR START-UP GUIDE: SOURCE FOR A WEBSITE PAGE
+=============================================================
+
+NOTES FOR THE AGENT BUILDING THE PAGE (do not publish this section)
+-------------------------------------------------------------------
+- Build one page from everything under "PAGE CONTENT". Keep the commands exactly as written.
+- Audience: competition teams who have just been given a drone and know basic Linux.
+- Keep the rules prominent, near the top of the page.
+- Show "HOW WE START YOUR DRONE" as a highlighted box directly under the intro. Keep the order
+  of its steps exactly as written: the software only takes over when the pilot switches to
+  Position after arming, with the drone still on the ground.
+- Anything in {CURLY_BRACES} is a placeholder that an organiser must fill in. If a value is
+  missing, leave a visible "ask the organisers" note. Never invent one.
+- NEVER put these on a public page: the Jetson login password, the Wi-Fi password, Tailscale
+  addresses or auth keys. Teams get passwords in person or on a team card, not from the website.
+- Link to the repository README and competitor guide for details instead of copying them:
+    https://github.com/Artash-N/skybeta#readme
+    https://github.com/Artash-N/skybeta/blob/main/docs/competitor_guide.md
+
+Placeholders to fill in:
+  {TEAM_TABLE}        team name -> drone number -> hostname (see the table in section 2)
+
+PAGE CONTENT
+------------
+
+TITLE: Get started with your drone
+
+INTRO
+Every team gets one drone. It comes ready to go, with the camera, position tracking and flight
+controller link already set up. You write the code that decides where it flies. This page takes
+you from a drone in your hands to your first code running on it.
+
+Need help? Message Kelvin on Slack (kelvinkn@stanford.edu).
+
+
+HOW WE START YOUR DRONE
+
+  1. We put your drone in the cage.
+  2. The safety pilot arms the drone.
+  3. The safety pilot switches to Position mode.
+  4. Your code takes over from there.
+
+That is everything we do. Nobody logs in or types a command, so your code must already be running
+when the drone is armed, and it must take off and fly by itself. Build and rehearse for exactly
+this sequence, with the props off first. Section 7 lists what has to be ready.
+
+
+1. RULES: READ THESE FIRST
+
+You have root on your drone so that you can work freely. These rules still apply.
+
+  Do not SSH into another team's drone.
+  Logging in to any drone other than your own will get you disqualified. This holds whether or
+  not the login works and whether or not the drone is in use. If you reach the wrong drone by
+  mistake, log out and tell the organisers.
+
+  Do not override the doctor or monitoring scripts.
+  Do not edit, replace, disable, stop, wrap or fake the output of:
+    - the doctor health check: host/doctor.sh
+    - the status agent: skybeta-status.service and /opt/skybeta-status/
+    - the ROS status sidecar: skybeta-ros-status.service and /run/skybeta-status/
+    - Tailscale on the drone, which is the organisers' link to it
+  Running host/doctor.sh yourself is always fine.
+
+  Do not change the sudo password.
+  Do not change the password of the dronehacks account. It is the login and the sudo password,
+  and the organisers need it to maintain your drone.
+
+  Feel free to fork the repository.
+  Fork it and work from your fork. Keep your code in your fork or in ~/team_ws, and leave the
+  ~/skybeta folder on the drone as it is, because the organisers update it.
+
+  You may change PX4 parameters, at your own risk.
+  Anything that happens as a result is your responsibility. The drone ships with parameters set
+  for this airframe. Changing UXRCE_DDS_*, MAV_1_CONFIG, SER_TEL2_BAUD or EKF2_* can cut the link
+  to the Jetson or stop the drone using vision for position. Write down what you change and its
+  old value.
+
+  Fly safely.
+  A safety pilot on RC is always there and can take over at any moment. Run new code with the
+  props off first, then low and tethered. No drone has flown a hover on this system yet, so your
+  first runs are the test.
+
+
+2. WHAT YOU NEED
+
+  - Your drone number. The drone's hostname is skybeta-NN, where NN is your number with two
+    digits: drone 7 is skybeta-07, drone 23 is skybeta-23.
+  - The login user: dronehacks
+  - The login password and the Wi-Fi password, which the organisers give you in person.
+  - A laptop with an SSH client. macOS, Linux and Windows 10 or later have one built in.
+  - A USB cable that carries data, for the Jetson's USB-C port.
+
+  {TEAM_TABLE}
+
+    Team        Drone number    Hostname
+    ----------  --------------  -----------
+    {TEAM}      {NN}            skybeta-{NN}
+
+
+3. CONNECT TO YOUR DRONE
+
+The first time, use the USB cable. It always works, and it tells you the drone's Wi-Fi address.
+
+Step 1. Plug in the OAK-D camera, then power on the drone and wait about a minute for the Jetson
+  to boot. Keep the drone still while it starts.
+
+Step 2. Connect your laptop to the Jetson's USB-C port.
+
+Step 3. Log in over USB. Every Jetson uses this same address over USB:
+
+    ssh dronehacks@192.168.55.1
+
+  Type yes if asked to trust the host, then enter the login password.
+
+Step 4. Check that you are on your own drone:
+
+    hostname
+
+  It must show skybeta-NN with your drone number. If it does not, log out and tell the organisers.
+
+Step 5. Find the drone's Wi-Fi address:
+
+    ip -4 -br addr show wlP1p1s0
+
+  The address is the number before the slash, for example 10.0.0.42 in 10.0.0.42/24.
+
+Step 6. Connect your laptop to the same Wi-Fi network as the drone: DroneHacks Wifi (the name is
+  case-sensitive).
+
+Step 7. From now on, log in over Wi-Fi with no cable:
+
+    ssh dronehacks@<your-drone's-wifi-address>
+
+The Wi-Fi address can change after a restart. If it stops working, go back to USB and repeat
+step 5.
+
+Optional: to log in without typing the password, run this once on your laptop:
+
+    ssh-keygen -t ed25519
+    ssh-copy-id dronehacks@<your-drone's-wifi-address>
+
+Optional: VS Code's Remote - SSH extension connects to the same address, so you can edit code on
+the drone directly.
+
+
+4. CHECK THE DRONE IS HEALTHY
+
+On the drone:
+
+    cd ~/skybeta
+    host/doctor.sh
+
+WARN lines are usually fine. If any line says FAIL, contact Kelvin on Slack (kelvinkn@stanford.edu).
+
+Keep the drone still for the first minute after power-up. Position and heading are measured from
+where it was when the software started.
+
+Look at the running software:
+
+    docker exec -it skybeta-stack tmux attach -t skybeta
+
+There are four windows: agent, slam, bridge and competitor. Press Ctrl-b then 0, 1, 2 or 3 to
+switch, and Ctrl-b then d to leave without stopping anything.
+
+If that command says there is no such container, the stack is not set to start at boot on your
+drone. Start it by hand with host/run.sh stack.
+
+
+5. WRITE YOUR CODE
+
+Your code goes in ~/team_ws/src on the drone. Code written anywhere else, including inside a
+container, can be lost.
+
+Start from the example:
+
+    cp -r ~/skybeta/src/competitor_example ~/team_ws/src/my_team_nav
+
+Rename the package in package.xml, setup.py, setup.cfg and resource/. Then open the drone's
+settings file with sudo nano /etc/skybeta/drone.env and set these two lines to your package and
+launch file:
+
+    COMPETITOR_PKG=my_team_nav
+    COMPETITOR_LAUNCH=competitor.launch.py
+
+Change only those two lines in that file. Restart the stack, on the ground and with the drone
+still:
+
+    docker rm -f skybeta-stack
+
+It comes back in about 10 seconds and builds your workspace.
+
+Your code talks to the drone through these topics:
+
+    /visual_slam/tracking/odometry   you read this: where the drone is
+    /skybeta/state                   you read this: what the flight controller is doing
+    /skybeta/setpoint/pose           you write this: where to go
+    /skybeta/setpoint/twist          you write this: how fast to move
+
+Do not publish to /fmu/in/* yourself.
+
+To use your fork or your own repository, clone it into the team workspace:
+
+    cd ~/team_ws/src
+    git clone https://github.com/<you>/<your-repo>.git
+
+A GitHub fork of a public repository is public, so other teams can read it. To keep your code
+private, create a new private repository and push your packages there.
+
+
+6. HOW A FLIGHT WORKS
+
+  1. Power up and keep the drone still for the first minute.
+  2. Your code starts sending setpoints.
+  3. The safety pilot arms, then switches to Position. Your code cannot arm the drone.
+  4. The drone switches to autonomy once, and your code takes off and flies.
+  5. The pilot can take over at any moment with the sticks, the mode switch or the kill switch.
+
+The drone leaves the ground as soon as autonomy starts. There is no horizontal geofence: keeping
+the drone inside the flying area is your code's job and the pilot's.
+
+Read section 4 of the competitor guide with your safety pilot before your first flight.
+
+
+7. HOW YOUR DRONE IS TESTED
+
+  1. We put your drone in the cage.
+  2. The safety pilot arms the drone, on the ground, with the mode switch on Altitude.
+  3. The safety pilot switches to Position, within a few seconds.
+  4. We expect your drone to take over from there. Your code takes off and flies with nothing
+     more from us.
+
+All of this has to be true before the pilot arms:
+
+  - Your code starts by itself. COMPETITOR_PKG and COMPETITOR_LAUNCH are set, so your node runs in
+    the competitor window with nobody logged in.
+  - Your launch file starts flight_interface with auto_offboard_on_arm:=true. Copying the
+    example's launch file does this.
+  - Your node is already publishing setpoints, at least once a second, before arming.
+  - Vision is tracking, so the drone has a valid position. Leave it still for the first minute.
+
+Takeover happens when the pilot switches to Position after arming, with the drone on the ground.
+It happens once per arming. Arming with the switch already on Position does not start your code,
+and neither does switching to Position in the air. If anything above is missing, the drone stays
+in Position under the pilot, and the log says:
+
+    auto offboard: staying out of Offboard: <reason>
+
+Your code also has to take off within 10 seconds of arming, or the drone disarms.
+
+Rehearse this whole sequence with the props off before your test.
+
+
+8. IF SOMETHING GOES WRONG
+
+  ssh: connection timed out over Wi-Fi
+    Check that your laptop is on the same network as the drone. Use USB to confirm the drone's
+    current Wi-Fi address.
+
+  ssh over USB does not connect
+    Wait a full minute after power-on and try a different cable: many USB cables only charge.
+
+  "REMOTE HOST IDENTIFICATION HAS CHANGED" on 192.168.55.1
+    Every Jetson shares that USB address, so this appears if your laptop has connected to a
+    different Jetson. First make sure this is your own drone, then run:
+      ssh-keygen -R 192.168.55.1
+
+  host/doctor.sh shows FAIL
+    Contact Kelvin on Slack (kelvinkn@stanford.edu). Do not edit the script.
+
+  Anything else
+    See https://github.com/Artash-N/skybeta/blob/main/docs/debugging.md or contact
+    Kelvin on Slack (kelvinkn@stanford.edu).

@@ -1,0 +1,198 @@
+# Skybeta — x86_64 SIM image: cuVSLAM + PX4 bridge + MicroXRCEAgent, no camera.
+#
+# This is docker/Dockerfile.jetson with the OAK-D removed and the UART replaced by
+# UDP. It runs the *identical* ROS 2 workspace (src/) against Isaac Sim + Pegasus
+# + PX4 SITL, so a competitor's package builds and behaves the same on a
+# workstation as on the drone.
+#
+# Build (context = repo root):
+#   docker build -f docker/Dockerfile.sim -t skybeta-sim:$(cat VERSION) .
+#
+# Run (see sim/README.md for the full checklist):
+#   docker run --rm -it --runtime nvidia --gpus all \
+#     --network host --ipc host \
+#     -e ROS_DOMAIN_ID=0 \
+#     skybeta-sim:<tag> bash
+#
+# --network host is not optional. The container has to reach PX4 SITL's
+# uxrce_dds_client on UDP 8888 on the host loopback, and it has to share a DDS
+# discovery domain with the ROS 2 bridge running inside Isaac Sim — which is a
+# host process, because Isaac Sim is a desktop application bound to the display
+# and the NVIDIA driver.
+#
+# ---------------------------------------------------------------------------
+# WHAT IS NOT IN HERE: Isaac Sim and Pegasus.
+# ---------------------------------------------------------------------------
+# Isaac Sim 5.1.0 is installed on the host (a ~15 GB zip plus streamed Nucleus
+# assets), it needs the host's GPU driver and display, and it ships its own
+# Python 3.11 interpreter that Pegasus is pip-installed into — an interpreter
+# that deliberately unsets AMENT_PREFIX_PATH/PYTHONPATH to keep ROS 2 Humble's
+# Python 3.10 out of its way (see the `isaac_run` shell function in the Pegasus
+# installation docs). Putting that in the same container as a ROS 2 Humble
+# workspace buys nothing and breaks both. Host runs the simulator; container runs
+# the stack; they meet over DDS and UDP.
+#
+# ---------------------------------------------------------------------------
+# BASE IMAGE
+# ---------------------------------------------------------------------------
+# The x86_64 twin of the aarch64 tag Dockerfile.jetson pins. NGC publishes only
+# content-addressed tags for nvcr.io/nvidia/isaac/ros — there is no plain
+# `x86_64-ros2_humble`. The pairing is established by build metadata, not by
+# guessing: over the 13 published x86_64-ros2_humble_* and 13
+# aarch64-ros2_humble_* tags the creation timestamps pair one-to-one, and
+#
+#   aarch64-ros2_humble_4c0c55dddd2bbcc3e8d5f9753bee634c  2025-11-07T20:39:55Z  arm64
+#   x86_64-ros2_humble_f247dd1051869171c3fc53bb35f6b907   2025-11-07T19:26:23Z  amd64
+#
+# are the newest of each arch and the same isaac_ros_common `ros2_humble` layer
+# stack (identical history, differing only in TARGETPLATFORM=linux/arm64 vs
+# linux/amd64). Both carry the same
+# `deb https://isaac.download.nvidia.com/isaac-ros/release-3 jammy release-3.0`
+# apt source, which serves ros-humble-isaac-ros-visual-slam 3.2.6-0jammy and
+# ros-humble-isaac-ros-image-proc 3.2.10-0jammy for amd64 as well as arm64.
+#
+# If NVIDIA ever withdraws the tag, rebuild the base with isaac_ros_common:
+#   git clone -b release-3.2 https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_common
+#   isaac_ros_common/scripts/build_image_layers.sh \
+#       --image_key x86_64.ros2_humble --image_name skybeta-sim-base:local
+# then pass --build-arg SIM_BASE=skybeta-sim-base:local.
+ARG SIM_BASE=nvcr.io/nvidia/isaac/ros:x86_64-ros2_humble_f247dd1051869171c3fc53bb35f6b907
+FROM ${SIM_BASE}
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG XRCE_AGENT_TAG=v2.4.3
+
+# Same dated ROS snapshot as the flight image, so the two are built from one
+# frozen archive and a package that resolves on the drone resolves here.
+# Verified for binary-amd64 as well as binary-arm64.
+ARG SNAPSHOT_DATE=2026-08-07
+
+ARG PX4_MSGS_REF=release/1.16
+ARG PX4_ROS2_LIB_REF=release/1.16
+
+SHELL ["/bin/bash", "-c"]
+
+# 0. Reproducible apt sources. Identical to Dockerfile.jetson except arch=amd64.
+#    The isaac-ros release-3 channel in the base image's /etc/apt/sources.list is
+#    already pinned and is left alone.
+COPY docker/ros-snapshots.key.asc /tmp/ros-snapshots.key.asc
+RUN gpg --dearmor < /tmp/ros-snapshots.key.asc \
+        > /usr/share/keyrings/ros-snapshots-archive-keyring.gpg \
+ && rm -f /tmp/ros-snapshots.key.asc \
+ && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/ros-snapshots-archive-keyring.gpg] http://snapshots.ros.org/humble/${SNAPSHOT_DATE}/ubuntu jammy main" \
+        > /etc/apt/sources.list.d/ros2.list
+
+# 1. Apt layer.
+#    - isaac-ros-visual-slam + image-proc: the same cuVSLAM 3.2.6 and the same
+#      GPU ImageFormatConverterNode the flight image uses. image-proc is named
+#      explicitly (visual-slam Depends on it anyway) because sim/skybeta_sim.launch.py
+#      loads its converter directly.
+#    - topic-tools: the /oak/* mirror relays in sim/skybeta_sim.launch.py.
+#    - NO depthai-*: there is no OAK-D on a workstation, and the v3 driver would
+#      pull ~200 MB for a device that never enumerates.
+#    - NO ros-humble-diagnostic-updater workaround: that trap (bug #0) exists only
+#      because depthai-ros-driver-v3 dlopens libdiagnostic_updater.so.
+RUN rm -f /etc/apt/sources.list.d/kitware*.list \
+          /etc/apt/sources.list.d/yarn*.list || true \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends \
+        build-essential cmake git wget curl ca-certificates sudo \
+        python3-pip python3-dev tmux \
+        python3-colcon-common-extensions python3-rosdep python3-vcstool \
+        ros-humble-isaac-ros-visual-slam \
+        ros-humble-isaac-ros-visual-slam-interfaces \
+        ros-humble-isaac-ros-image-proc \
+        ros-humble-isaac-ros-nitros-imu-type \
+        ros-humble-isaac-ros-nitros-odometry-type \
+        ros-humble-topic-tools \
+        ros-humble-ament-index-cpp \
+        ros-humble-eigen3-cmake-module \
+        libeigen3-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# 2. MAVProxy — the SITL equivalent of the §3 wire sanity test. PX4 SITL's
+#    mavlink instance offers UDP 14550 on the host, so
+#    `mavproxy.py --master=udp:127.0.0.1:14550` proves the FC is alive without
+#    involving DDS at all. Pulls pymavlink, which tools/param_diff.py wants.
+RUN pip3 install --no-cache-dir MAVProxy
+
+# 3. Micro-XRCE-DDS-Agent v2.4.3 — the tag PX4's own v1.16 ROS 2 user guide
+#    specifies. Same version as the flight image; do not bump to v3.x.
+#    Used here as `MicroXRCEAgent udp4 -p 8888`, matching the
+#    `uxrce_dds_client start -t udp -p 8888` that PX4 SITL's rcS starts
+#    unconditionally.
+RUN git clone -b ${XRCE_AGENT_TAG} \
+        https://github.com/eProsima/Micro-XRCE-DDS-Agent.git \
+        /opt/Micro-XRCE-DDS-Agent \
+ && cmake -S /opt/Micro-XRCE-DDS-Agent -B /opt/Micro-XRCE-DDS-Agent/build \
+ && make  -C /opt/Micro-XRCE-DDS-Agent/build -j"$(nproc)" \
+ && make  -C /opt/Micro-XRCE-DDS-Agent/build install \
+ && ldconfig /usr/local/lib/
+
+# 4. ROS 2 workspace. The WHOLE of src/ — oakd_vslam_bringup (the bridge and its
+#    launch files), skybeta_flight_interface, competitor_example,
+#    competitor_advanced_cpp — plus px4_msgs and px4-ros2-interface-lib at
+#    release/1.16 to match the v1.16.2 firmware SITL runs.
+#
+#    The COLCON_IGNORE sweep exists because those competitor packages are written
+#    by a different work package and may be absent, or present but not yet
+#    complete, when this image is built. A directory under src/ with no
+#    package.xml is not a ROS package and colcon would fail on it; marking it
+#    ignored keeps the image buildable at every point of the merge. It does NOT
+#    rescue a package that has a package.xml but does not compile — that is a
+#    real failure and should stay one.
+RUN mkdir -p /root/skybeta_ws/src
+COPY src/ /root/skybeta_ws/src/
+RUN cd /root/skybeta_ws/src \
+ && git clone --depth 1 -b ${PX4_MSGS_REF} https://github.com/PX4/px4_msgs.git \
+ && git clone --recursive --depth 1 -b ${PX4_ROS2_LIB_REF} \
+        https://github.com/Auterion/px4-ros2-interface-lib.git \
+ && touch px4-ros2-interface-lib/examples/COLCON_IGNORE \
+ && git -C px4_msgs rev-parse HEAD > /root/skybeta_ws/px4_msgs.sha \
+ && git -C px4-ros2-interface-lib rev-parse HEAD > /root/skybeta_ws/px4_ros2_lib.sha \
+ && for d in */ ; do \
+        if [ ! -f "${d}package.xml" ]; then \
+            echo "[skybeta-sim] ${d} has no package.xml -> COLCON_IGNORE"; \
+            touch "${d}COLCON_IGNORE"; \
+        fi; \
+    done \
+ && cd /root/skybeta_ws \
+ && source /opt/ros/humble/setup.bash \
+ && colcon build --symlink-install --event-handlers console_direct+ \
+        --cmake-args -DBUILD_TESTING=OFF
+
+# 5. Container-side helper scripts on $PATH. run_agent.sh honours
+#    XRCE_TRANSPORT=udp4 (set below), so `run_agent.sh` does the right thing here
+#    with no arguments. run_slam.sh expects an OAK-D and will not work — use
+#    sim/skybeta_sim.launch.py instead.
+COPY container_scripts/ /usr/local/bin/
+RUN chmod +x /usr/local/bin/*.sh
+
+# 6. The sim profile itself. Baked in so the image is self-contained; bind-mount
+#    the repo over it (`-v $PWD/sim:/root/skybeta_ws/sim:ro`) while iterating so a
+#    launch-file edit does not need a rebuild.
+COPY sim/ /root/skybeta_ws/sim/
+
+# 7. Provenance.
+LABEL org.opencontainers.image.title="skybeta-sim" \
+      org.opencontainers.image.description="x86_64 Isaac Sim / PX4 SITL profile of the skybeta cuVSLAM + uXRCE-DDS stack" \
+      org.opencontainers.image.source="https://github.com/kelvindinhnguyen/skybeta" \
+      io.skybeta.ros-snapshot="${SNAPSHOT_DATE}" \
+      io.skybeta.px4-firmware="1.16.2" \
+      io.skybeta.px4-msgs-ref="${PX4_MSGS_REF}" \
+      io.skybeta.px4-ros2-lib-ref="${PX4_ROS2_LIB_REF}" \
+      io.skybeta.xrce-agent="${XRCE_AGENT_TAG}" \
+      io.skybeta.isaac-ros="3.2" \
+      io.skybeta.isaac-sim="5.1.0" \
+      io.skybeta.pegasus="v5.1.0"
+
+# uXRCE-DDS over UDP, not the drone's /dev/ttyTHS1. XRCE_DEV is deliberately
+# unset: run_agent.sh only looks at it on the serial branch.
+ENV XRCE_TRANSPORT=udp4 \
+    XRCE_UDP_PORT=8888
+
+RUN echo 'source /opt/ros/humble/setup.bash'                >> /root/.bashrc \
+ && echo 'source /root/skybeta_ws/install/local_setup.bash' >> /root/.bashrc
+
+WORKDIR /root/skybeta_ws
+CMD ["/bin/bash"]

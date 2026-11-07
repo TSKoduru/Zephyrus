@@ -1,0 +1,180 @@
+# Skybeta — distributable Jetson image: cuVSLAM (OAK-D-S2) + uXRCE-DDS bridge
+# + MicroXRCEAgent + MAVProxy. Boot it on any Jetson Orin with the host-side
+# UART DMA patch applied (host/provision.sh) and a Pixhawk wired to TELEM2.
+#
+# Build:        host/build_image.sh          (context = repo root)
+# Distribution: host/push_image.sh / host/pull_image.sh (registry, base-first
+#               so only the ~1 GB skybeta delta transfers). aarch64-only by
+#               virtue of the NGC Isaac ROS base.
+#
+# Base is the exact NGC Isaac ROS Humble tag that isaac_ros_common's
+# run_dev.sh pulls — the bare `aarch64-ros2_humble` tag does not exist on
+# NGC, only the content-addressed variants. This one is what `isaac_ros_slam`
+# already has cached locally, so the build reuses it.
+FROM nvcr.io/nvidia/isaac/ros:aarch64-ros2_humble_4c0c55dddd2bbcc3e8d5f9753bee634c
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG XRCE_AGENT_TAG=v2.4.3
+
+# Dated ROS snapshot. `packages.ros.org/ros2` is a rolling repo: two builds of
+# this "pinned" image weeks apart resolve different candidates (that is how the
+# libdiagnostic_updater.so trap in step 1b was born). snapshots.ros.org freezes
+# the whole Humble archive at a date, so a rebuild is byte-for-byte reproducible
+# as long as this ARG does not move. Verified against 2026-08-07: it carries
+# depthai-ros-*-v3 3.3.0 and ros-humble-diagnostic-updater 4.0.7 (the build that
+# actually ships the .so). See docker/apt-pins.txt for the resulting versions.
+ARG SNAPSHOT_DATE=2026-08-07
+
+# Git refs for the two cloned ROS packages. Branches, so a rebuild can drift if
+# upstream moves them — pass an exact SHA to freeze a fleet build:
+#   --build-arg PX4_MSGS_REF=392e831c1f659429ca83902e66820d7094591410
+# The SHAs actually used are recorded in /root/skybeta_ws/*.sha inside the image.
+ARG PX4_MSGS_REF=release/1.16
+ARG PX4_ROS2_LIB_REF=release/1.16
+
+SHELL ["/bin/bash", "-c"]
+
+# 0. Reproducible apt sources.
+#    - ros2.list (packages.ros.org, rolling) -> snapshots.ros.org/humble/<date>.
+#      Signed by a *different* key than packages.ros.org: "ROS Snapshot builder
+#      <rosbuild@ros.org>" 4B63CF8FDE49746E98FA01DDAD19BAB3CBF125EA, vendored as
+#      docker/ros-snapshots.key.asc so the build needs no keyserver.
+#    - The Isaac ROS packages do NOT come from packages.ros.org. The base image
+#      carries `deb https://isaac.download.nvidia.com/isaac-ros/release-3 jammy
+#      release-3.0` in /etc/apt/sources.list (not sources.list.d), and that is
+#      where isaac-ros-visual-slam 3.2.6 and the NITROS types resolve from. It is
+#      already a pinned release-3 channel, so it is left alone.
+#    - `ros2-testing-apt-source` is deliberately NOT installed: it adds
+#      packages.ros.org/ros2-testing, whose versions move without notice.
+COPY docker/ros-snapshots.key.asc /tmp/ros-snapshots.key.asc
+RUN gpg --dearmor < /tmp/ros-snapshots.key.asc \
+        > /usr/share/keyrings/ros-snapshots-archive-keyring.gpg \
+ && rm -f /tmp/ros-snapshots.key.asc \
+ && echo "deb [arch=arm64 signed-by=/usr/share/keyrings/ros-snapshots-archive-keyring.gpg] http://snapshots.ros.org/humble/${SNAPSHOT_DATE}/ubuntu jammy main" \
+        > /etc/apt/sources.list.d/ros2.list
+
+# 1. Apt layer. Mirrors isaac_ros_slam Dockerfile.user (depthai-ros-driver-v3,
+#    isaac-ros-visual-slam, NITROS imu/odometry types) plus the build deps
+#    we need for the agent + workspace + tmux for the full-stack launcher.
+#    Kept in one RUN so it caches as a single ~3 GB layer.
+RUN rm -f /etc/apt/sources.list.d/kitware*.list \
+          /etc/apt/sources.list.d/yarn*.list || true \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends \
+        build-essential cmake git wget curl ca-certificates sudo \
+        python3-pip python3-dev libusb-1.0-0-dev udev usbutils tmux \
+        python3-colcon-common-extensions python3-rosdep python3-vcstool \
+        ros-humble-depthai-ros-driver-v3 \
+        ros-humble-depthai-bridge-v3 \
+        ros-humble-depthai-ros-msgs-v3 \
+        ros-humble-depthai-descriptions-v3 \
+        ros-humble-isaac-ros-visual-slam \
+        ros-humble-isaac-ros-visual-slam-interfaces \
+        ros-humble-isaac-ros-nitros-imu-type \
+        ros-humble-isaac-ros-nitros-odometry-type \
+        ros-humble-diagnostic-updater \
+        ros-humble-ament-index-cpp \
+        ros-humble-eigen3-cmake-module \
+        libeigen3-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# 1b. The NGC base ships ros-humble-diagnostic-updater 4.0.6 pre-installed, and that
+#     build contains ONLY the Python module -- no libdiagnostic_updater.so. apt therefore
+#     considers depthai-ros-driver-v3's `Depends: ros-humble-diagnostic-updater` already
+#     satisfied and never upgrades it, so the driver's composable node dies at load time
+#     with "libdiagnostic_updater.so: cannot open shared object file". Naming the package
+#     explicitly above pulls the candidate (4.0.7), which does ship the C++ library.
+#
+# 1c. ament-index-cpp / eigen3-cmake-module / libeigen3-dev are px4_ros2_cpp's build
+#     deps (see its package.xml). All three are already in the NGC base, but they are
+#     named here so the image does not silently depend on a base-image implementation
+#     detail — and so apt-pins.txt records their versions.
+
+# 2. Python deps — depthai (host runtime) + MAVProxy (sanity test §3 of the
+#    setup doc).
+#    Pinned to exactly what skybeta:0.1.0 resolved (`pip3 list` in that image).
+#    Unpinned, a rebuild on 2026-10-11 pulled numpy 2.2.6 (over the base's
+#    1.26.4, which ROS Humble's compiled Python modules are built against),
+#    opencv-python 5.0 and vtk via MAVProxy 1.8.75, and depthai 3.11 -- none of
+#    it ever run on the vehicle. The snapshot date pins apt; this pins pip.
+RUN pip3 install --no-cache-dir \
+        depthai==3.10.0 \
+        MAVProxy==1.8.74 \
+        pymavlink==2.4.49 \
+        "numpy<2"
+
+# 3. OAK-D udev rule baked in (also installed on the host by host/provision.sh).
+RUN echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="03e7", MODE="0666"' \
+    > /etc/udev/rules.d/80-movidius.rules
+
+# 4. Micro-XRCE-DDS-Agent v2.4.3 — the tag PX4's own v1.16 ROS 2 user guide
+#    specifies. Do not bump to v3.x.
+RUN git clone -b ${XRCE_AGENT_TAG} \
+        https://github.com/eProsima/Micro-XRCE-DDS-Agent.git \
+        /opt/Micro-XRCE-DDS-Agent \
+ && cmake -S /opt/Micro-XRCE-DDS-Agent -B /opt/Micro-XRCE-DDS-Agent/build \
+ && make  -C /opt/Micro-XRCE-DDS-Agent/build -j"$(nproc)" \
+ && make  -C /opt/Micro-XRCE-DDS-Agent/build install \
+ && ldconfig /usr/local/lib/
+
+# 5. ROS 2 workspace: oakd_vslam_bringup (copied) + px4_msgs @ release/1.16
+#    + px4-ros2-interface-lib @ release/1.16 (px4_ros2_cpp — the advanced
+#    competitor track: custom flight modes registered with PX4).
+#    px4_msgs must match the firmware: this fleet runs PX4 v1.16.2, and
+#    release/1.16 is the generation whose messages carry MESSAGE_VERSION.
+#    The lib's examples/ are COLCON_IGNOREd — they are reference source for
+#    src/competitor_advanced_cpp, not something the flight image needs built.
+#    Delete that marker to build them.
+#    BUILD_TESTING=OFF: px4_ros2_cpp's test block pulls the whole ament_lint
+#    chain, which is dead weight in a flight image.
+#    Cache busts when anything under src/ changes.
+#    The whole src/ tree is copied, not just oakd_vslam_bringup: the image must
+#    also carry skybeta_flight_interface (the competitor-facing offboard
+#    wrapper), competitor_example and competitor_advanced_cpp, or
+#    run_full_stack.sh's `competitor` window falls back to its "not in this
+#    image" hint. Competitors fork this repo and add their own packages here,
+#    so a blanket COPY is the right default.
+RUN mkdir -p /root/skybeta_ws/src
+COPY src/ /root/skybeta_ws/src/
+RUN cd /root/skybeta_ws/src \
+ && git clone --depth 1 -b ${PX4_MSGS_REF} https://github.com/PX4/px4_msgs.git \
+ && git clone --recursive --depth 1 -b ${PX4_ROS2_LIB_REF} \
+        https://github.com/Auterion/px4-ros2-interface-lib.git \
+ && touch px4-ros2-interface-lib/examples/COLCON_IGNORE \
+ && git -C px4_msgs rev-parse HEAD > /root/skybeta_ws/px4_msgs.sha \
+ && git -C px4-ros2-interface-lib rev-parse HEAD > /root/skybeta_ws/px4_ros2_lib.sha \
+ && cd /root/skybeta_ws \
+ && source /opt/ros/humble/setup.bash \
+ && colcon build --symlink-install --event-handlers console_direct+ \
+        --cmake-args -DBUILD_TESTING=OFF
+
+# 6. Container-side helper scripts on $PATH.
+COPY container_scripts/ /usr/local/bin/
+# Blanket chmod rather than an explicit list: the list silently omitted
+# record_bag.sh when it was added, and a non-executable helper on $PATH fails
+# in a confusing way.
+RUN chmod +x /usr/local/bin/*.sh
+
+# 7. Auto-source ROS + the skybeta underlay + the team overlay (/root/team_ws,
+#    bind-mounted from the host by host/run.sh) for interactive shells. One file,
+#    container_scripts/skybeta_env.sh, so shells and scripts cannot disagree.
+RUN echo 'source /usr/local/bin/skybeta_env.sh' >> /root/.bashrc \
+ && mkdir -p /root/team_ws/src
+
+# 8. Provenance, readable without a shell:
+#    docker inspect --format '{{json .Config.Labels}}' skybeta:<tag>
+LABEL org.opencontainers.image.title="skybeta" \
+      org.opencontainers.image.description="Jetson cuVSLAM (OAK-D-S2) + PX4 uXRCE-DDS stack" \
+      org.opencontainers.image.source="https://github.com/Artash-N/skybeta" \
+      io.skybeta.ros-snapshot="${SNAPSHOT_DATE}" \
+      io.skybeta.px4-firmware="1.16.2" \
+      io.skybeta.px4-msgs-ref="${PX4_MSGS_REF}" \
+      io.skybeta.px4-ros2-lib-ref="${PX4_ROS2_LIB_REF}" \
+      io.skybeta.xrce-agent="${XRCE_AGENT_TAG}" \
+      io.skybeta.isaac-ros="3.2"
+
+ENV XRCE_DEV=/dev/ttyTHS1 \
+    XRCE_BAUD=921600
+
+WORKDIR /root/skybeta_ws
+CMD ["/bin/bash"]

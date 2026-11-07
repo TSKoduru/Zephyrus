@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>oakd_vslam_bringup</name>
+  <version>0.1.0</version>
+  <description>Bringup: OAK-D stereo + IMU into isaac_ros_visual_slam.</description>
+  <maintainer email="kelvindinhnguyen@gmail.com">kelvin</maintainer>
+  <license>Apache-2.0</license>
+
+  <exec_depend>depthai_ros_driver_v3</exec_depend>
+  <exec_depend>isaac_ros_visual_slam</exec_depend>
+  <!-- ImageFormatConverterNode: GPU bgr8 -&gt; mono8, replaces the Python bgr_to_mono -->
+  <exec_depend>isaac_ros_image_proc</exec_depend>
+  <!-- VisualSlamStatus.vo_state drives VehicleOdometry.reset_counter -->
+  <exec_depend>isaac_ros_visual_slam_interfaces</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>px4_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

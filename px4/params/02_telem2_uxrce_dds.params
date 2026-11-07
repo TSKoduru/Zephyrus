@@ -1,0 +1,24 @@
+# Onboard parameters for Vehicle 1
+#
+# STAGE 2 - TELEM2 as uXRCE-DDS. Transport only, no estimator changes.
+#
+# Load this only AFTER stage 1 has proved the wire.
+# Hands TELEM2 from MAVLink to the uXRCE-DDS client. MAVProxy will stop working
+# on this port - that is expected.
+# UXRCE_DDS_DOM_ID is deliberately NOT in this file: it is per-airframe. Set it by
+# hand to this drone's ROS_DOMAIN_ID from /etc/skybeta/drone.env (convention:
+# = DRONE_ID). Every drone left on 0 shares one DDS domain on a shared network.
+# UXRCE_DDS_PTCFG = 2 (custom participant): PX4 asks the agent for its DDS
+# participant by reference, and the agent builds it from host/dds/agent_refs_<scope>.xml
+# (loopback-only by default). With 0, the agent builds PX4's own XML on every
+# interface and the loopback-only ROS nodes never discover it -- /fmu/* silently
+# never reaches the bridge. Measured on the bench; see host/dds/agent_refs_local.xml.
+# After loading: reboot the FC, start run_agent.sh, then check that /fmu/out/*
+# topics appear and /fmu/out/timesync_status is ticking.
+#
+# Vehicle-Id	Component-Id	Name	Value	Type
+1	1	MAV_1_CONFIG	0	6
+1	1	UXRCE_DDS_CFG	102	6
+1	1	UXRCE_DDS_KEY	1	6
+1	1	UXRCE_DDS_PTCFG	2	6
+1	1	SER_TEL2_BAUD	921600	6

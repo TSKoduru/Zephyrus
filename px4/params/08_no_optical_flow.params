@@ -1,0 +1,32 @@
+# Onboard parameters for Vehicle 1
+#
+# STAGE 8 - FLEET HARDWARE: there is NO optical-flow sensor on any skybeta airframe.
+# Independent of vision, UART and the container. Loads on every FC.
+#
+# The only range/ground sensor on these airframes is ONE downward-facing laser
+# rangefinder with a narrow (~1 deg, per the fleet owner 2026-11-03) beam. PX4
+# drives it with the VL53L1X driver (SENS_EN_VL53L1X = 1, kept); its
+# DISTANCE_SENSOR reports laser, downward, 0-4 m (read off drone 16's FC
+# 2026-11-03). Horizontal position comes from the Jetson's VIO and nothing
+# else -- no GPS, no flow.
+#
+# The reference airframe's May-07 dump, and therefore 00_baseline.params, still
+# carries the optical-flow configuration of an older sensor set:
+#
+#   EKF2_OF_CTRL    1 -> 0     EKF2 optical-flow fusion off
+#   SENS_EN_PMW3901 1 -> 0     PMW3901 (SPI) flow driver not started
+#   SENS_TFLOW_CFG  103 -> 0   ThoneFlow-3901U serial flow driver off TELEM3
+#
+# With no sensor attached those values fuse nothing, but they make every reader
+# (and every param review) believe the airframe has a flow fallback for position
+# hold. It does not: when VIO tracking is lost, Position mode has no horizontal
+# aiding left and PX4 falls back to Altitude behaviour.
+#
+# Kept out of 00_baseline.params so tools/param_diff.py --make-baseline still
+# reproduces the baseline from the May-07 dump (same reasoning as 04-07).
+# Reboot the FC after loading (the SENS_* values are read at boot).
+#
+# Vehicle-Id	Component-Id	Name	Value	Type
+1	1	EKF2_OF_CTRL	0	6
+1	1	SENS_EN_PMW3901	0	6
+1	1	SENS_TFLOW_CFG	0	6

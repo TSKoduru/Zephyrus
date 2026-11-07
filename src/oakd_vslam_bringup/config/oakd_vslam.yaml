@@ -1,0 +1,89 @@
+# OAK-D-S2 camera configuration for the cuVSLAM pipeline (depthai_ros_driver_v3).
+#
+# Sockets CAM_B / CAM_C are OV9282 *monochrome* 1280x800 sensors, but the v3 driver
+# reports supportedTypes=[MONO, COLOR] for them and publishes bgr8 either way, and the
+# v3 parameter set exposes no output-encoding option for the left/right sockets. The
+# mono8 conversion cuVSLAM needs therefore happens host-side, in oakd_vslam.launch.py
+# (isaac_ros_image_proc ImageFormatConverterNode, on the GPU).
+#
+# There is deliberately NO `stereo:` block here. With i_pipeline_type: stereo the driver
+# instantiates only the two mono sensor nodes -- no StereoDepth node -- so every key that
+# used to live under `stereo:` (i_publish_left_rect, i_publish_right_rect,
+# i_publish_synced_rect_pair, i_depth_preset, i_reverse_stereo_socket_order) was read by
+# nobody. Measured topic list with this config: /oak/{left,right}/{image_raw,camera_info}
+# and /oak/imu/data -- no *_rect, no depth. Re-add the block only if a depth or rectify
+# node is actually enabled. (Repo bug #5.)
+/oak:
+  ros__parameters:
+    driver:
+      # No-op on an OAK-D-S2: the S2 has no IR laser dot projector and no flood LED.
+      # Kept explicit so this same file is safe on an OAK-D Pro, where the default
+      # (true) would switch the emitters on.
+      i_enable_ir: false
+
+    pipeline_gen:
+      i_pipeline_type: stereo
+      i_enable_imu: true
+      i_nn_type: none
+
+    # ONE block per socket. These were previously declared twice each; YAML keeps only
+    # the last occurrence, so i_width / i_height / i_fps were silently dropped and the
+    # driver ran at its 640x400 default -- a quarter of the intended pixel count reaching
+    # cuVSLAM. (Repo bug #3.) Do not split these blocks again.
+    #
+    # WHY 1024x640 AND NOT THE SENSOR'S NATIVE 1280x800.
+    # The driver ships these mono sockets as bgr8 (3 bytes/px for a monochrome sensor),
+    # and the OAK-D-S2's XLink/USB path saturates around 143 MB/s. Measured with the
+    # driver alone -- no cuVSLAM, no converters, only the tiny camera_info topics
+    # recorded, so nothing host-side is in the way -- over 40 s each:
+    #
+    #   both eyes 1280x800 @30  -> 23.3 Hz   (143 MB/s: at the ceiling, ~23% of frames
+    #                                         dropped, p95 gap 66.7 ms = one lost frame)
+    #   LEFT ONLY 1280x800 @30  -> 30.0 Hz   (92 MB/s: proves it is throughput, not the
+    #                                         sensor, the ISP or the host)
+    #   both eyes 1280x800 @20  -> 20.0 Hz   (123 MB/s: clean, but costs 1/3 of the rate)
+    #   both eyes 1280x800 @30 with i_low_bandwidth: true -> 23.3 Hz  (no help)
+    #   both eyes 1024x640 @30  -> 30.0 Hz   (118 MB/s: clean, 2.56x the pixels of 640x400)
+    #   both eyes  960x600 @30  -> 30.0 Hz   (104 MB/s: clean, more margin, 2.25x pixels)
+    #   both eyes  640x400 @30  -> 30.0 Hz   (46 MB/s: the old accidental default)
+    #
+    # 1280x800 also costs more than frames: the two eyes drop *different* frames, so the
+    # stereo pairs cuVSLAM can match fall to 16.4 Hz and L/R header sync p95 goes from
+    # 0.02 ms to 33.3 ms. 1024x640 @30 is the best point on that frontier -- it keeps the
+    # 30 Hz design point the whole pipeline assumes while giving cuVSLAM 2.56x the pixels
+    # it was actually getting. Go to 960x600 if you need margin; go to 1280x800 only if
+    # you first find a way to get mono8 off the device (the v3 parameter set exposes no
+    # output-encoding option for these sockets, so today there is none).
+    left:
+      i_publish_topic: true
+      i_enable_lazy_publisher: false   # cuVSLAM subscribes late; publish from t=0
+      i_width: 1024                    # 0.8x of the OV9282's native 1280x800
+      i_height: 640
+      i_fps: 30.0
+
+    right:
+      i_publish_topic: true
+      i_enable_lazy_publisher: false
+      i_width: 1024
+      i_height: 640
+      i_fps: 30.0
+
+    imu:
+      # BNO086. Measured, not assumed: leaving i_acc_freq / i_gyro_freq at their
+      # documented defaults (480 / 400) yields only 26.3 Hz on /oak/imu/data -- the part
+      # does not sustain those rates through this driver. Asking for 200 Hz explicitly
+      # gives a clean 199.5 Hz (interval p50 5.01 / p95 5.47 ms).
+      i_acc_freq: 200
+      i_gyro_freq: 200
+      # IMU -> plain sensor_msgs/Imu on /oak/imu/data (IMU_WITH_MAG* would publish a
+      # depthai_ros_msgs type that cuVSLAM cannot subscribe to).
+      i_message_type: IMU
+      # Interpolate accel onto the gyro timestamps so the output is evenly spaced.
+      # COPY reaches the same 199.5 Hz but with a lumpier interval (p95 8.8 vs 5.5 ms).
+      # The driver logs "For RVC4 devices we currently support COPY method" -- the
+      # OAK-D-S2 is RVC2, so that warning does not apply here.
+      i_sync_method: LINEAR_INTERPOLATE_ACCEL
+      i_batch_report_threshold: 1      # one report per packet: lowest latency
+      i_max_batch_reports: 10
+      i_enable_rotation: false         # no fused quaternion; cuVSLAM wants raw
+      i_enable_mag: false

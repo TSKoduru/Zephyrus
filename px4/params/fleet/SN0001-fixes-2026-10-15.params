@@ -1,0 +1,63 @@
+# Onboard parameters for Vehicle 1
+#
+# SN0001 (bench airframe, drone 1) -- what it SHOULD have, as a delta against what it
+# actually had on 2026-10-15 (SN0001-2026-10-15.params, firmware v1.16.1).
+# Load in QGC: Vehicle Setup -> Parameters -> Tools -> Load from file, then REBOOT the FC.
+# Only the parameters listed here change. Save a fresh dump afterwards and diff it.
+#
+# DDS (drone 1; must match ROS_DOMAIN_ID=1 in this Jetson's /etc/skybeta/drone.env)
+#   UXRCE_DDS_DOM_ID  0 -> 1   was 0: the agent's topics landed in a domain the stack never reads
+#   UXRCE_DDS_PTCFG   0 -> 2   custom participant: the agent builds it on loopback from
+#                              host/dds/agent_refs_local.xml. With 0 the loopback-only stack
+#                              never discovers it and no /fmu data arrives (bench-measured).
+#
+# Height: range finder as the reference, PX4 v1.16 "Indoor (non-flat terrain)" configuration
+# (docs.px4.io/v1.16/en/advanced_config/tuning_the_ecl_ekf.html, Height) -- the course may
+# have boxes and tables. Same as px4/params/03a_height_reference.params:
+#   GPS_CTRL 0, BARO_CTRL 1, RNG_CTRL 1 (conditional), HGT_REF 2 (range).
+#   EKF2_HGT_REF      0 -> 2   trust the range finder (ST VL53L1X) over the barometer
+#   EKF2_BARO_CTRL    0 -> 1   keep baro as a bias-corrected BACKUP. With baro off and GPS off,
+#                              losing the range finder (above its 4 m driver maximum, over an
+#                              obstacle, a bad sample) leaves NO height aiding -- the runaway
+#                              climb. With it on, PX4 "continues to estimate its height using
+#                              the other sensors".
+#   EKF2_RNG_CTRL     2 -> 1   conditional: range fused only below EKF2_RNG_A_VMAX (1 m/s) and
+#                              EKF2_RNG_A_HMAX, with a height-above-ground consistency gate, so
+#                              boxes and tables do not drag the height estimate around; above
+#                              those, baro is the reference. (2 = always: flat floors only --
+#                              over an obstacle PX4 resets the height to the new reading.)
+#   EKF2_RNG_A_HMAX   5 -> 3   inside the VL53L1X's 4 m driver maximum
+#   EKF2_GPS_CTRL     0 (unchanged, indoor)
+#
+# Vision -- fusion stays ON (EKF2_EV_CTRL 9 = horizontal position + yaw, unchanged; the
+# operator's decision 2026-10-16)
+#   EKF2_EV_DELAY    50 -> 70  measured 2026-10-16 on this Jetson with skybeta:0.2.0
+#                              (tools/latency_probe.py: image -> bridge p50 68.7 ms, p95 102 ms,
+#                              + ~1-2 ms serial). 50 was a placeholder.
+#   EKF2_EVP_GATE    50 -> 5   baseline. At 50 the innovation gate accepts any vision jump
+#   EKF2_EVV_GATE    50 -> 3   (e.g. a cuVSLAM relocalisation) straight into position.
+#
+# Ceiling
+#   GF_MAX_VER_DIST   0 -> 3   the VL53L1X driver maximum is 4 m (long mode) and less in bright
+#                              light; keep the vehicle well inside it. GF_ACTION is 2 (Hold).
+#                              Adjust to the venue; 0 disables.
+#
+# NOT changed here -- decide first:
+#   NAV_RCL_ACT = 6 (Disarm: on RC loss the motors stop and it falls). Baseline is 2 (Return),
+#     which needs a home position/GPS; indoors 3 (Land) is the usual choice.
+#   PWM_MAIN_FUNC1-4 = 101-104 AND PWM_AUX_FUNC1-4 = 101,104,103,102: motors are output on both
+#     MAIN and AUX. Clear the set the ESCs are NOT wired to.
+#   Firmware: v1.16.1; the fleet pins v1.16.2. Reflashing erases all parameters -- dump first.
+#
+# Vehicle-Id	Component-Id	Name	Value	Type
+1	1	UXRCE_DDS_DOM_ID	1	6
+1	1	UXRCE_DDS_PTCFG	2	6
+1	1	EKF2_HGT_REF	2	6
+1	1	EKF2_BARO_CTRL	1	6
+1	1	EKF2_RNG_CTRL	1	6
+1	1	EKF2_RNG_A_HMAX	3.000000000000000000	9
+1	1	EKF2_GPS_CTRL	0	6
+1	1	EKF2_EV_DELAY	70.000000000000000000	9
+1	1	EKF2_EVP_GATE	5.000000000000000000	9
+1	1	EKF2_EVV_GATE	3.000000000000000000	9
+1	1	GF_MAX_VER_DIST	3.000000000000000000	9

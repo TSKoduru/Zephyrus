@@ -1,0 +1,124 @@
+# Onboard parameters for Vehicle 1
+#
+# STAGE 6 - FLEET POLICY: RadioMaster transmitter -- stick order and channel
+# calibration. Independent of vision, UART and the container. Loads on every FC.
+#
+# Read off drone 20's FC on 2026-11-01 after QGC's Radio calibration with the fleet's
+# RadioMaster (px4/params/fleet/drone20-radiomaster-2026-11-01.params). Every drone
+# flies with the same transmitter model and the same model setup, so the endpoints,
+# trims and deadzones are the same on every FC; the per-transmitter spread is a few
+# microseconds inside the 10 us deadzone.
+#
+# RC_MAP_ROLL/PITCH/THROTTLE/YAW = 1/2/3/4   AETR. The May-07 reference dump (and so
+#                      00_baseline.params until 2026-11-01) carried TAER (4/3/2/1) from a
+#                      different model setup: flashing that onto a RadioMaster drone
+#                      scrambles the sticks. Arm (7), kill (5) and flight mode (6) are in
+#                      05 / the baseline.
+# RC1..RC4             sticks: 982 / 1494 / 2005, deadzone 10; throttle (RC3) trims at
+#                      its minimum, 982, which is what PX4 expects for a non-centring
+#                      throttle.
+# RC5..RC8             switches: 1000 / 1500 / 2000, deadzone 10.
+# RC9..RC18            unused, PX4 defaults, pinned here so the baseline carries no RC<n>_*
+#                      rows at all (one place defines the radio).
+#
+# Fleet-wide, not per-unit, since 2026-11-01: tools/param_diff.py and
+# ~/pixhawk_autoparams.py no longer treat RC<n>_(MIN|MAX|TRIM|DZ|REV) as calibration.
+# Kept out of 00_baseline.params so --make-baseline still reproduces the baseline from
+# the May-07 dump. A drone with a different transmitter needs its own file instead of
+# this one. Reboot the FC after loading.
+#
+# Vehicle-Id	Component-Id	Name	Value	Type
+1	1	RC_MAP_ROLL	1	6
+1	1	RC_MAP_PITCH	2	6
+1	1	RC_MAP_THROTTLE	3	6
+1	1	RC_MAP_YAW	4	6
+1	1	RC1_MIN	982.000000	9
+1	1	RC1_TRIM	1494.000000	9
+1	1	RC1_MAX	2005.000000	9
+1	1	RC1_DZ	10.000000	9
+1	1	RC1_REV	1.000000	9
+1	1	RC2_MIN	982.000000	9
+1	1	RC2_TRIM	1494.000000	9
+1	1	RC2_MAX	2005.000000	9
+1	1	RC2_DZ	10.000000	9
+1	1	RC2_REV	1.000000	9
+1	1	RC3_MIN	982.000000	9
+1	1	RC3_TRIM	982.000000	9
+1	1	RC3_MAX	2005.000000	9
+1	1	RC3_DZ	10.000000	9
+1	1	RC3_REV	1.000000	9
+1	1	RC4_MIN	982.000000	9
+1	1	RC4_TRIM	1495.000000	9
+1	1	RC4_MAX	2005.000000	9
+1	1	RC4_DZ	10.000000	9
+1	1	RC4_REV	1.000000	9
+1	1	RC5_MIN	1000.000000	9
+1	1	RC5_TRIM	1500.000000	9
+1	1	RC5_MAX	2000.000000	9
+1	1	RC5_DZ	10.000000	9
+1	1	RC5_REV	1.000000	9
+1	1	RC6_MIN	1000.000000	9
+1	1	RC6_TRIM	1500.000000	9
+1	1	RC6_MAX	2000.000000	9
+1	1	RC6_DZ	10.000000	9
+1	1	RC6_REV	1.000000	9
+1	1	RC7_MIN	1000.000000	9
+1	1	RC7_TRIM	1500.000000	9
+1	1	RC7_MAX	2000.000000	9
+1	1	RC7_DZ	10.000000	9
+1	1	RC7_REV	1.000000	9
+1	1	RC8_MIN	1000.000000	9
+1	1	RC8_TRIM	1500.000000	9
+1	1	RC8_MAX	2000.000000	9
+1	1	RC8_DZ	10.000000	9
+1	1	RC8_REV	1.000000	9
+1	1	RC9_MIN	1000.000000	9
+1	1	RC9_TRIM	1500.000000	9
+1	1	RC9_MAX	2000.000000	9
+1	1	RC9_DZ	0.000000	9
+1	1	RC9_REV	1.000000	9
+1	1	RC10_MIN	1000.000000	9
+1	1	RC10_TRIM	1500.000000	9
+1	1	RC10_MAX	2000.000000	9
+1	1	RC10_DZ	0.000000	9
+1	1	RC10_REV	1.000000	9
+1	1	RC11_MIN	1000.000000	9
+1	1	RC11_TRIM	1500.000000	9
+1	1	RC11_MAX	2000.000000	9
+1	1	RC11_DZ	0.000000	9
+1	1	RC11_REV	1.000000	9
+1	1	RC12_MIN	1000.000000	9
+1	1	RC12_TRIM	1500.000000	9
+1	1	RC12_MAX	2000.000000	9
+1	1	RC12_DZ	0.000000	9
+1	1	RC12_REV	1.000000	9
+1	1	RC13_MIN	1000.000000	9
+1	1	RC13_TRIM	1500.000000	9
+1	1	RC13_MAX	2000.000000	9
+1	1	RC13_DZ	0.000000	9
+1	1	RC13_REV	1.000000	9
+1	1	RC14_MIN	1000.000000	9
+1	1	RC14_TRIM	1500.000000	9
+1	1	RC14_MAX	2000.000000	9
+1	1	RC14_DZ	0.000000	9
+1	1	RC14_REV	1.000000	9
+1	1	RC15_MIN	1000.000000	9
+1	1	RC15_TRIM	1500.000000	9
+1	1	RC15_MAX	2000.000000	9
+1	1	RC15_DZ	0.000000	9
+1	1	RC15_REV	1.000000	9
+1	1	RC16_MIN	1000.000000	9
+1	1	RC16_TRIM	1500.000000	9
+1	1	RC16_MAX	2000.000000	9
+1	1	RC16_DZ	0.000000	9
+1	1	RC16_REV	1.000000	9
+1	1	RC17_MIN	1000.000000	9
+1	1	RC17_TRIM	1500.000000	9
+1	1	RC17_MAX	2000.000000	9
+1	1	RC17_DZ	0.000000	9
+1	1	RC17_REV	1.000000	9
+1	1	RC18_MIN	1000.000000	9
+1	1	RC18_TRIM	1500.000000	9
+1	1	RC18_MAX	2000.000000	9
+1	1	RC18_DZ	0.000000	9
+1	1	RC18_REV	1.000000	9

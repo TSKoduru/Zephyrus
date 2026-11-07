@@ -1,0 +1,29 @@
+# skybeta-stack.service -- the full skybeta stack (MicroXRCEAgent, OAK-D + cuVSLAM,
+# PX4 odometry bridge, competitor) started at boot, so the FC has VIO position
+# aiding whenever the drone is powered.
+#
+# Template: rendered and installed by host/autostart.sh (@USER@ / @REPO@ are
+# filled in). Edit this file and re-run `sudo host/autostart.sh enable`, not the
+# copy in /etc/systemd/system.
+[Unit]
+Description=skybeta stack (uXRCE agent + cuVSLAM VIO + PX4 bridge), started at boot
+Documentation=file://@REPO@/docs/fleet_guide.md
+After=docker.service
+Requires=docker.service
+# Retry forever: the camera or docker may need a few attempts after a cold boot.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@REPO@
+ExecStart=/bin/bash @REPO@/host/stack_service.sh
+# Belt and braces: never leave a stack container behind when the service ends.
+ExecStopPost=-/usr/bin/docker rm -f skybeta-stack
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=40
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

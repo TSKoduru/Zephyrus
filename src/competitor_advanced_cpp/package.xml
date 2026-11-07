@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>competitor_advanced_cpp</name>
+  <version>0.1.0</version>
+  <description>
+    Advanced competitor track: "Skybeta Goto", a px4_ros2::ModeBase custom
+    flight mode registered with PX4 so it appears in QGroundControl's mode
+    list and on the RC mode switch. NOT behind the skybeta safety envelope --
+    see include/skybeta_goto_mode.hpp before flying it.
+  </description>
+  <maintainer email="kelvindinhnguyen@gmail.com">kelvin</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>eigen3_cmake_module</buildtool_depend>
+  <buildtool_export_depend>eigen3_cmake_module</buildtool_export_depend>
+
+  <build_depend>eigen</build_depend>
+  <build_depend>rclcpp</build_depend>
+  <build_export_depend>eigen</build_export_depend>
+
+  <depend>px4_ros2_cpp</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

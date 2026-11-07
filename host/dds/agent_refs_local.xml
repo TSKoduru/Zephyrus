@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  skybeta: the MicroXRCEAgent's DDS participant for PX4, kept on this Jetson.
+
+  Used when SKYBETA_DDS_SCOPE=local (the default). host/run.sh mounts it at
+  /etc/skybeta/agent_refs.xml; run_agent.sh passes it as `MicroXRCEAgent -r`.
+  The FC must set UXRCE_DDS_PTCFG=2 ("custom participant"): PX4 then asks the
+  agent for the participant by the reference name "px4_participant" instead of
+  sending its own XML, so this profile is what the agent builds.
+
+  Why the agent needs its own file: the default-profile mechanism in
+  fastdds_localhost.xml does NOT reach it. With UXRCE_DDS_PTCFG=0 the client
+  sends a participant XML of its own and the agent builds exactly that, on
+  every interface. Measured on the bench (skybeta:0.2.0, Orin Nano, wlP1p1s0,
+  XRCE client impersonating PX4 v1.16.2):
+
+    PTCFG=0, ROS nodes on fastdds_localhost.xml   ROS never discovers the agent; 15 DDS packets on WiFi
+    PTCFG=1 (PX4 localhost-only XML)              discovered in 1.4 s; 0 packets on WiFi
+    PTCFG=2 + this file                           discovered in 0.2 s; 0 packets on WiFi
+
+  So with PTCFG=0 and local scope, /fmu/* never reaches the bridge or the flight
+  interface. PTCFG=2 is used rather than 1 so that SKYBETA_DDS_SCOPE alone (via
+  agent_refs_network.xml) also moves the agent onto the network for debugging,
+  with no FC change.
+
+  UDP on 127.0.0.1 only, no shared memory: the agent links its own Fast DDS
+  (2.14) while the ROS nodes run 2.6, and loopback UDP is the path measured
+  above. Initial-peer range 32 for the same reason as fastdds_localhost.xml.
+-->
+<dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <profiles>
+    <transport_descriptors>
+      <transport_descriptor>
+        <transport_id>skybeta_agent_udp_loopback</transport_id>
+        <type>UDPv4</type>
+        <maxInitialPeersRange>32</maxInitialPeersRange>
+        <interfaceWhiteList>
+          <address>127.0.0.1</address>
+        </interfaceWhiteList>
+      </transport_descriptor>
+    </transport_descriptors>
+    <participant profile_name="px4_participant">
+      <rtps>
+        <name>px4_micro_xrce_dds</name>
+        <userTransports>
+          <transport_id>skybeta_agent_udp_loopback</transport_id>
+        </userTransports>
+        <useBuiltinTransports>false</useBuiltinTransports>
+        <builtin>
+          <initialPeersList>
+            <locator>
+              <udpv4>
+                <address>127.0.0.1</address>
+              </udpv4>
+            </locator>
+          </initialPeersList>
+        </builtin>
+      </rtps>
+    </participant>
+  </profiles>
+</dds>

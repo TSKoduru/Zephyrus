@@ -1,0 +1,38 @@
+# Onboard parameters for Vehicle 1
+#
+# STAGE 4 - FLEET POLICY: RC transmitter only, roll failure detector off.
+# Independent of vision, UART and the container. Loads on every FC.
+#
+# COM_RC_IN_MODE = 0   "RC Transmitter only" (PX4 v1.16 enum: 0 RC only, 1 Joystick
+#                      only, 2 RC and Joystick with fallback, 3 RC or Joystick keep
+#                      first, 4 Stick input disabled). The reference airframe's May-07
+#                      dump, and therefore 00_baseline.params until 2026-10-22, carried
+#                      1 = Joystick only: with that value "RC input handling and the
+#                      associated checks are disabled", so the safety pilot's
+#                      transmitter is ignored. Every drone flies under an RC safety
+#                      pilot (docs/hardware_checklist.md), so RC is the only stick
+#                      source. With 0 the RC-loss failsafe (NAV_RCL_ACT) is live again
+#                      and PX4's RC sanity check applies to the mapped channels
+#                      (RC<n>_MIN/TRIM/MAX must be ordered; the defaults are) --
+#                      still run QGC's Radio calibration per drone (fleet guide 2b).
+#
+# FD_FAIL_R = 0        failure detector roll limit, degrees; "setting this parameter
+#                      to 0 disables the check" (v1.16.2 source, FailureDetector
+#                      params). Default 60: beyond 60 deg of roll for FD_FAIL_R_TTRI
+#                      (0.3 s) the detector raises attitude_failure, which on takeoff
+#                      locks the motors down and otherwise terminates the flight when
+#                      CBRK_FLIGHTTERM = 0. The fleet keeps CBRK_FLIGHTTERM = 121212
+#                      (termination disabled) but the takeoff lockdown is independent
+#                      of that breaker; a roll excursion during an aggressive
+#                      competitor takeoff would cut the motors mid-air. Decided
+#                      2026-10-22: roll is not a failure criterion on these airframes.
+#                      FD_FAIL_P (pitch, 60 deg) is deliberately left in place.
+#
+# Both values are not per-unit, but they are kept out of 00_baseline.params so that
+# tools/param_diff.py --make-baseline still reproduces the baseline from the May-07
+# dump (selftest step 4): a staged file is where a fleet-wide value that differs from
+# the reference airframe belongs. Reboot the FC after loading.
+#
+# Vehicle-Id	Component-Id	Name	Value	Type
+1	1	COM_RC_IN_MODE	0	6
+1	1	FD_FAIL_R	0	6

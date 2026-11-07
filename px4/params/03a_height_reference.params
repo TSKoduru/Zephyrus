@@ -1,0 +1,40 @@
+# Onboard parameters for Vehicle 1
+#
+# STAGE 3a - HEIGHT. Independent of vision, UART and the container.
+#
+# Range finder as the height reference, barometer as backup: PX4 v1.16's documented
+# "Indoor (non-flat terrain)" configuration -- GPS_CTRL 0, BARO_CTRL 1, RNG_CTRL 1
+# (conditional), HGT_REF 2 (range). Source: docs.px4.io/v1.16/en/advanced_config/
+# tuning_the_ecl_ekf.html, "Height". Non-flat because the course may have boxes and
+# tables: in conditional mode the range finder is only fused at low speed
+# (< EKF2_RNG_A_VMAX, 1 m/s) and low height (< EKF2_RNG_A_HMAX), with a consistency
+# gate on height-above-ground (EKF2_RNG_A_IGATE); otherwise PX4 "automatically
+# selects a secondary reference" -- the barometer. For a guaranteed-flat floor PX4's
+# "Indoor (flat terrain)" variant is EKF2_RNG_CTRL = 2 (always).
+#
+# The range finder is the airframe's ONLY ground sensor (there is no optical flow,
+# see 08): one downward laser with a narrow ~1 deg beam, run by PX4's VL53L1X
+# driver, whose maximum is 4 m (less in bright light), one reading per 200 ms. Hence
+# EKF2_RNG_A_HMAX = 3 m, inside that range, and a matching GF_MAX_VER_DIST on each
+# drone (see fleet/<serial>-fixes-*.params).
+#
+# The runaway climb this replaces: the May-07 airframe had HGT_REF = 2 (range),
+# BARO_CTRL = 0 and GPS off. Whenever the range finder stopped delivering (above
+# its range, over an obstacle, a rejected sample) there was NO height source left;
+# the estimate free-ran, the controller read it as sinking and climbed forever.
+# The essential fix is BARO_CTRL = 1: with a second source PX4 "continues to
+# estimate its height using the other sensors". (EKF2_RNG_A_HMAX, blamed for this
+# until 2026-10-15, only applies in conditional mode.)
+#
+# Caveat from the same PX4 page: switching between height references makes the
+# absolute altitude estimate drift over time.
+#
+# After loading: reboot the FC, then the props-off and hand-lift checks of
+# docs/fleet_guide.md step 6 before any hover.
+#
+# Vehicle-Id	Component-Id	Name	Value	Type
+1	1	EKF2_HGT_REF	2	6
+1	1	EKF2_BARO_CTRL	1	6
+1	1	EKF2_RNG_CTRL	1	6
+1	1	EKF2_RNG_A_HMAX	3.000000	9
+1	1	EKF2_GPS_CTRL	0	6

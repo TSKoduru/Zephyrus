@@ -1,0 +1,5 @@
+# Everything here runs on Linux (Jetson / Ubuntu). Force LF in the working tree even on a
+# Windows checkout with core.autocrlf=true, so a script copied straight to a drone does not
+# die on $'\r'.
+* text=auto eol=lf
+*.px4 binary

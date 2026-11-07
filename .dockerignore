@@ -1,0 +1,38 @@
+# Keep the docker build context small and, more importantly, deterministic.
+#
+# The Dockerfiles do `COPY src/ /root/skybeta_ws/src/`, so anything a competitor
+# leaves lying around in the working tree would otherwise be baked into the
+# image and would bust the colcon cache layer on every build. A local
+# `colcon build` in the repo root is the common case.
+#
+# Note: docker/Dockerfile.sim also copies sim/, so sim/ must NOT be excluded.
+
+# colcon / ament output
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Recorded data — grows fast, never belongs in an image
+bags/
+*.mcap
+*.db3
+*.tar
+*.tar.zst
+
+# VCS and editor state
+.git/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Host-side trees the images never consume. The Dockerfiles use only
+# src/, container_scripts/, sim/ and docker/ros-snapshots.key.asc.
+host/
+tools/
+px4/

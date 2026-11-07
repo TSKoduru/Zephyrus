@@ -1,0 +1,18 @@
+# Onboard parameters for Vehicle 1
+#
+# STAGE 1 - TELEM2 as MAVLink, to prove the UART wiring works.
+#
+# Load this FIRST. It puts TELEM2 back on MAVLink so mavproxy can see the FC.
+# After loading: reboot the FC, then on the Jetson run
+#     mavproxy.py --master=/dev/ttyTHS1,57600 --show-errors
+# You should get a HEARTBEAT within a second or two.
+# Baud is dropped to 57600 deliberately - more tolerant of marginal wiring
+# than 921600 while you are still chasing a dead link (setup doc section 3).
+#
+# Vehicle-Id	Component-Id	Name	Value	Type
+1	1	MAV_1_CONFIG	102	6
+1	1	MAV_1_MODE	2	6
+1	1	MAV_1_FLOW_CTRL	0	6
+1	1	MAV_1_FORWARD	0	6
+1	1	SER_TEL2_BAUD	57600	6
+1	1	UXRCE_DDS_CFG	0	6

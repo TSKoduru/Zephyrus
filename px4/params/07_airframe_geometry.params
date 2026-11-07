@@ -1,0 +1,33 @@
+# Onboard parameters for Vehicle 1
+#
+# STAGE 7 - FLEET POLICY: airframe geometry. Independent of vision, UART and the
+# container. Loads on every FC.
+#
+# Read off drone 20's FC on 2026-11-01 (px4/params/fleet/drone20-radiomaster-2026-11-01
+# .params), where it had been entered by hand in QGC's Actuators page. All fleet
+# airframes are the same frame, so the values are fleet-wide.
+#
+# CA_ROTOR<n>_PX/PY    rotor positions, m, body FRD, for the control allocator. The May-07
+#                      dump (and so the baseline until 2026-11-01) had PX4's generic
+#                      +-1.000 placeholders, i.e. a square 2 m frame: the allocator then
+#                      has the wrong arm lengths and the frame's front/rear asymmetry
+#                      (front arms x = +0.08, rear x = -0.15; y = +-0.16 front, +-0.14
+#                      rear). Rotor order, spin direction (CA_ROTOR<n>_KM) and thrust
+#                      coefficients are unchanged from the baseline.
+# EKF2_RNG_POS_Z = 0.034450   range-finder position below the body origin, m, as
+#                      measured on drone 20 (the baseline had 0). EKF2_RNG_POS_Y stays
+#                      -0.027432 from the reference airframe.
+#
+# Kept out of 00_baseline.params so --make-baseline still reproduces the baseline from
+# the May-07 dump. Reboot the FC after loading.
+#
+# Vehicle-Id	Component-Id	Name	Value	Type
+1	1	CA_ROTOR0_PX	0.080000	9
+1	1	CA_ROTOR0_PY	0.160000	9
+1	1	CA_ROTOR1_PX	-0.150000	9
+1	1	CA_ROTOR1_PY	-0.140000	9
+1	1	CA_ROTOR2_PX	0.080000	9
+1	1	CA_ROTOR2_PY	-0.160000	9
+1	1	CA_ROTOR3_PX	-0.150000	9
+1	1	CA_ROTOR3_PY	0.140000	9
+1	1	EKF2_RNG_POS_Z	0.034450	9
