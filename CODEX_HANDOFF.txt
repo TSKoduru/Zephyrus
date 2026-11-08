@@ -1,0 +1,236 @@
+CODEX HANDOFF — 2026-11-08 UTC
+Repository: https://github.com/TSKoduru/Zephyrus (branch main)
+This is a curated continuation record, not a verbatim conversation transcript.
+
+START HERE / CURRENT TASK
+The user wants a read-only walk-around localization test first: carry the disarmed
+real drone around the cage and watch its estimated position and particle cloud in
+the SAME live SSH launch logs. Do not enable flight or restart old simulation
+research automatically. The historical high-noise PF research goal was explicitly
+paused. The user prefers short instructions and wants code readable (~300 lines
+per main module where practical), minimal flight changes, and compact logging.
+
+CURRENT BLOCKER ON THE DRONE
+The correct walk launch was eventually installed and showed its ASCII walls, but:
+  frames=0
+  last_error=waiting_for_calibrated_stereo_and_odometry
+  WALK LOCALIZATION: STALE / WAITING
+  particles=0; frame age infinite
+ROS CLI then reported /oak/right/image_mono not published.
+The user explained their previous camera procedure was:
+  sudo systemctl stop skybeta-stack
+  source ~/drone_env/bin/activate
+  python ~/app.py
+That standalone DepthAI app initializes 400p stereo and serves localhost:8080.
+It owns the camera and those commands stop the ROS stack. Its web preview is not
+proof of ROS stereo or cuVSLAM publication. We told the user to Ctrl-C app.py,
+ensure clock synchronization, then start skybeta-stack and inspect its slam
+window. We have NOT yet received confirmation that ROS camera data recovered.
+Do not diagnose missing data as poor PF convergence. Check actual topic names and
+camera/SLAM startup errors before changing estimator tuning.
+
+CURRENT COMMITTED BEHAVIOR (e7847b5 before this handoff commit)
+Organizer default:
+  ros2 launch competitor_example competitor.launch.py
+includes course_localization/walk_test.launch.py. It starts ONLY localize, with
+compact_logs=true, record_raw_topics=false, ascii_live=true.
+NO flight_interface, course controller, 10cm mission, arming, or flight commands
+are started by this launch. It does not stop unrelated processes already running.
+Expected banner:
+  WALK TEST ONLY: localization and compact logs; NO FLIGHT COMMANDS.
+The same launch log prints a 61x23 ASCII map at 2 Hz:
+  # = PF estimated center; . = particles (multiple particles can share a cell)
+  | - / backslash = nominal structural walls sliced at z=0.8 m
+  +Y up, +X right; XYZ/yaw/freshness above panel
+  STALE / WAITING explicitly marks missing/stale output
+The walls are the NOMINAL MAP, not measured/live depth walls. A tight cloud is not
+proof of accurate localization. A separate full-screen ascii_view exists but the
+user specifically prefers the inline launch-log view; no second display needed.
+First initialization builds map/cache before the ASCII timer starts. It was
+initially silent for a while; later the panel appeared, waiting for sensor data.
+
+LOGGING
+Initial test and compact walk/full-course configurations save no per-frame NPZ
+and no raw rosbag. CompactRecorder writes:
+  mission_transitions.jsonl — status/fault/gate changes
+  events.jsonl — recent states/status (exact subscriptions differ per node)
+  diagnostics.jsonl — measurements/poses/calibration and processing diagnostics
+  previews/ — up to 60 sampled sets at <=1 Hz, stereo JPEG <=320x200 and depth PNG
+              uint16 millimetres, 0 invalid
+  snapshots/ — latest two snapshot sets, binary PLY, <=50,000 voxels per cloud
+  manifest.json, storage_policy.json, configs/, final_health.json
+Text files rotate at 4 MiB with one backup each. Previous RUN DIRECTORIES are not
+automatically deleted, so total disk usage can still grow across repeated runs.
+Static archived config/reference files may include a small route NPZ; no NPZ
+sensor-frame recording. Original full-course non-compact mode still exists.
+Read docs/odom_10cm_test.md and docs/walk_and_before_tunnel.md for precise details.
+
+DEPLOYMENT / MACHINE ACCESS
+Drone SSH: dronehacks@192.168.55.1 (also called skybeta-10).
+Drone lacks internet. This Codex machine cannot reach the drone. The USER has a
+separate machine with internet, authenticated gh, and SSH access to the drone.
+Host workspace: ~/team_ws; container bind mount: /root/team_ws.
+Host repo/scripts: ~/skybeta; container base workspace: /root/skybeta_ws.
+Container name: skybeta-stack. tmux session: skybeta.
+Windows: 0 agent, 1 slam, 2 bridge, 3 competitor. Ctrl-b then digit switches.
+
+Transfer from the user's internet-connected machine:
+  gh repo clone TSKoduru/Zephyrus           # only if not yet cloned
+  cd Zephyrus                             # git pull --ff-only on later updates
+  tar -czf /tmp/walk-update.tar.gz -C src course_localization competitor_example skybeta_flight_interface
+  scp /tmp/walk-update.tar.gz dronehacks@192.168.55.1:~/
+  ssh dronehacks@192.168.55.1
+On drone HOST:
+  mkdir -p ~/team_ws/src
+  tar -xzf ~/walk-update.tar.gz -C ~/team_ws/src
+  sudo docker exec -it skybeta-stack bash
+In CONTAINER, disarmed; stop old competitor first:
+  tmux send-keys -t skybeta:competitor C-c
+  source skybeta_env.sh
+  team_build.sh && source skybeta_env.sh
+  ros2 launch course_localization walk_test.launch.py
+Avoid starting a duplicate of an already running walk/localization node.
+macOS tar 'LIBARCHIVE.xattr.com.apple.provenance' warnings did not prevent extract.
+'listing git files failed - pretending there aren't any' from copied packages did
+not prevent build. Overlay-shadow warnings are expected for these packages.
+A successful build does not download newer source! Earlier successful builds still
+ran old launch files because team_ws/src held stale copies.
+
+STACK STARTUP PREREQUISITES
+On drone HOST, stop standalone app.py first so the OAK is free:
+  test "$(timedatectl show -p NTPSynchronized --value)" = yes && sudo systemctl start skybeta-stack
+  cd ~/skybeta && host/doctor.sh
+  sudo docker exec -it skybeta-stack tmux attach -t skybeta
+The stack's competitor window builds and launches the configured team package by
+itself. Do not launch a duplicate. Check the actual WALK TEST ONLY banner.
+Keep the rig still during camera/cuVSLAM startup so origin/heading initialize.
+Clock sync matters: a clock step can make camera/vision stamps stale. The service
+has time-sync/restart handling; see docs/fleet_guide.md.
+Patched PX4 firmware is 7a39c59 (v1.16.2-derived). Power cycling can clear an old
+UART fault; it does NOT install firmware. Do not flash or change FC parameters
+without understanding actual deployed configuration. No SSH/physical deployment
+was performed by this Codex instance; user handles hardware.
+
+USEFUL NEXT DIAGNOSTICS (inside sourced container)
+  ros2 topic list | grep -E 'oak|image|camera_info|odometry'
+  ros2 topic echo /course/status --once --full-length
+  timeout 8 ros2 topic hz /visual_slam/tracking/odometry
+  timeout 8 ros2 topic hz /oak/left/image_mono
+  timeout 8 ros2 topic hz /oak/right/image_mono
+Inspect slam tmux window for camera/cuVSLAM errors. Missing calibration/TF may
+produce explicit processing errors once synchronized pairs/odometry exist.
+
+START POSITION / KNOWN CONFIG DISCREPANCY
+Route starts on floor, drone center z=0.116 m (landing gear on ground):
+  x=-2.5146, y=+0.9144, yaw=45 degrees toward +X/+Y, left side of course.
+CURRENT hardware.yaml PF prior is DIFFERENT:
+  [-2.4146, 0.8144, 0.116, 0.872664626] = yaw 50 degrees,
+  initial std [0.25,0.25,0.08,0.2617993878].
+This is a known ~14 cm / 5 degree mismatch; it was disclosed but NOT changed.
+Align the real placement/prior before interpreting walk results. PF assumes a
+known launch prior, not global localization from any arbitrary cage position.
+
+SEPARATE FLIGHT MODES — DO NOT CONFUSE WITH DEFAULT WALK TEST
+Original 10cm test now explicitly:
+  ros2 launch competitor_example odom_10cm.launch.py
+It uses cuVSLAM position for mission targets/arrival, and PX4 executes converted
+position targets with its own internal controller. It is NOT PX4-position-only.
+Flight sequence: up35cm, forward10cm along initial heading, down at .08m/s.
+Readiness gates: fresh VO, flight state, map logger, no competing publishers.
+Requires armed AND Offboard active. Default interface auto workflow requests
+Offboard when the pilot arms THEN switches to Position on ground. Arming already
+in Position does not auto-start. No separate mission 'go' command.
+Bench flags enable_motion=false auto_offboard_on_arm=false prevent its mission.
+Arrival threshold is 2.5cm continuously for1s; stage timeout20s requests HOLD,
+NOT autonomous landing. One stale/readiness fault latches STOPPED/HOLD.
+UP state is published one tick before first ascent pose; a fault can prevent any
+ascent target even if UP was briefly reported. Direct position frame alignment
+is off by default in interface; cuVSLAM vs PX4 origin/yaw mismatch is unresolved.
+Ctrl-C produced a double-rclpy-shutdown traceback on Humble; it did exit. This
+minor shutdown bug is not yet fixed. Do not mistake that traceback for continued
+flight process activity.
+
+Before-tunnel bounded feedback implementation (NOT MPC):
+  ros2 launch course_localization before_tunnel.launch.py
+Control defaults DISABLED; explicit enable_control=true enables pilot-triggered
+flight. Starts interface, PF localization with compact logs, feedback follower.
+Route src/course_localization/trajectory/before_tunnel.npz:
+  first section then land OUTSIDE tunnel at (2.00,1.70,0.116) m
+  ~8.51m, ~45s after startup-hold trimming
+  reference speed <=.25m/s; command norm <=.3048m/s = 1ft/s in controller/interface
+  final low approach descends .08m/s until PX4 landed; HOLD after touchdown;
+  faults/timeouts request HOLD and require pilot landing; no automatic disarm.
+Uses PF/map position and synchronized PX4 attitude for world velocity rotation;
+requires valid downward range and IMU. The uploaded NPZ frames had NO valid
+range measurement; do not bypass required sensors to force motion.
+Do not enable flight while walk/other setpoint publishers are running.
+Geometry check passed only nominal level-drone envelope (radius .32+.015m).
+Expanded additional10cm XYZ error envelope FAILED in narrow passages.
+No hardware flight validation, no robust10cm-error clearance guarantee.
+Docs + route diagram + reports: docs/before_tunnel/, docs/walk_and_before_tunnel.md.
+The controller is bounded velocity feedback, NOT MPC. Previous research MPC
+experiments do not mean any MPC controller is deployed.
+
+FLIGHT EVIDENCE / UNRESOLVED FAILURE
+1) Earlier pasted live launch explicitly ran old square_mission (1.5m hover,
+5m square), with 'armed already in Position: no autonomy'; no Offboard in THAT
+excerpt. User later transferred correct code. Never use this old excerpt to
+assert subsequent flights were manual.
+2) Archive 01_19_13.zip: 43 PX4 logs, all manual control, no Offboard. First42
+reported ~177deg roll with SENS_BOARD_ROT=0. Last02_16_39 had board rotation8,
+near-level roll and no inversion. EKF2_EV_CTRL=0 and xy_valid=false throughout.
+All internally datedOct31; uncertain provenance/clock. These cannot establish
+what happened in the later flight. ROS does not automatically correct a wrong
+physical FC orientation. Motor allocation/wiring not independently verified.
+3) 21_11_40.ulg: definitely Offboard active from~1.29s to pilot takeover32.18s.
+At~6.77s target became NED [0.044447,-1.171551,-1.365364] and stayed exactly fixed
+until takeover. Initial PX4 z=.065928 => commanded rise~1.431m, NOT35cm.
+No forward-leg/descent targets during that interval. PX4 z tracked near target.
+EKF2_EV_CTRL=9, SENS_BOARD_ROT=8, xy/z valid. ROS mission identity/state absent
+from this ULog. Possible coordinate-frame/deployed-code mismatch; not proven.
+Do NOT say arrival tolerance alone explains the1.43m target.
+4) message (1).txt: manifest and rosbag recorder output for
+20261107T211120.711594Z_f6594aeb3a90. Stereo logger source hash matched original
+pushed module82e5c008... Raw bag subscribed to mission_status, state, setpoints,
+VO. Recorder text isn't message contents. Relevant flight chunks2..8 cover
+21:11:36..21:12:24. Original raw images produced ~256MiB chunks every7s, hence
+compact logging fix. No old logs were deleted.
+5) Uploaded rosbag_20.db3 initially was still COPYING; early malformed-SQLite
+errors were NOT evidence of corrupt original logs. Once complete it was readable.
+Chunk20 covers~21:13:39, AFTER flight. First recorded mission state WAIT with
+'flight interface unavailable'; PX4 link false, disarmed, no local position.
+This late chunk cannot prove flight-time stage or original fault.
+6) NPZ000000002/003/009: timestamps21:31:55..57, NOT21:11 flight. Static near-floor
+stereo images, ~29–30% valid depth, central panel~2.7–3m, stereo skew17–19us,
+IMU coverage valid, range invalid, PF disabled. PNG exports were generated.
+
+LOCAL ARTIFACTS ON ORIGINAL CODEX MACHINE (NOT IN GITHUB)
+Workspace /home/evan/prj, drone repo /home/evan/Zephyrus.
+Simulator/assets: scene_real.xml; local camera/map scene based on user photos.
+Live static MuJoCo viewer scripts/view_course_map.py on DISPLAY=:11 using
+/home/evan/.Xauthority; current process was opened interactively, no flight replay.
+T overhead, A angled; viewer corrected to actual route ground start instead of
+scene's old z=.8 default. Do not open many duplicate viewers.
+Flight logs /home/evan/prj/01_19_13.zip, 21_11_40.ulg, rosbag_20.db3,
+message (1).txt, 000000002.npz, 000000003.npz, 000000009.npz.
+Analyses: flight_review_01_19_13/, flight_review_21_11_40/summary.json+targets.png,
+npz_review/overview.png+pngs.zip+summary.json. These large local artifacts were
+NOT added to Git. Request/upload relevant data separately on another device.
+
+VALIDATION DONE
+- All3Python ROS packages built in available Jazzy container, launch args inspected.
+- Package suite34passed,7skipped,6subtests; optional recorded/hardware tests skipped.
+- Two ROS synthetic-message pipeline smoke tests passed (legacy and compact walk).
+  Compact test checked no flight-command publishers and inline panel generation.
+- ASCII, speed-limit, landing sequencing and recorder-retention unit tests passed.
+- Three ideal kinematic route-following cases passed; NOT physical dynamics tests.
+- No completed real walk localization validation yet; no half-course flight validation.
+Target is ROS Humble on Jetson; local smoke environment was Jazzy/Python3.12.
+Do not confuse successful build/synthetic tests with actual sensor/flight readiness.
+
+COMMIT HISTORY
+1ba116a — course localization/logging/opt-in follower
+ db569f0 — default10cm initial flight + stereo map recorder + HOLD captures current position
+ c148d99 — bounded compact initial-test logger, no raw bag/NPZ frames
+ e7847b5 — default read-only walk + inline ASCII + separate before-tunnel route/controller
+This handoff commit adds documentation only. User explicitly authorized commit/push.
