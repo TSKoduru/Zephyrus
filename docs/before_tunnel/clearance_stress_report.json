@@ -1,0 +1,225 @@
+{
+  "source_sha256": "46293c05975e77ff4bee9649b26bf4084f3446d1f2979c7afc9fe97eec4e819f",
+  "endpoint": [
+    2.0,
+    1.7,
+    0.116
+  ],
+  "join_original_time_s": 16.00030716264842,
+  "duration_s": 53.07090726835055,
+  "distance_m": 8.514754175888928,
+  "max_reference_speed_mps": 0.2499999999999556,
+  "tunnel_front_y": 1.219,
+  "endpoint_front_clearance_m": 0.04599999999999982,
+  "sampled_envelope_radius_m": 0.43500000000000005,
+  "additional_xyz_error_margin_m": 0.1,
+  "trajectory_sha256": "dad7ff267e1202209074911210f982890ecfab3e6040b48d01300aa720f01a46",
+  "overlap_count": 1454,
+  "contacts": [
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.4990764394170648,
+      "point": [
+        -2.4059703694494843,
+        2.0974484573084458,
+        0.8
+      ],
+      "overlap_m": 0.00242961956972898
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.5090702823465119,
+      "point": [
+        -2.4032719211561084,
+        2.10707106456414,
+        0.8
+      ],
+      "overlap_m": 0.00501819985848595
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.519064125275959,
+      "point": [
+        -2.4004895833684428,
+        2.1166697497107925,
+        0.8
+      ],
+      "overlap_m": 0.007473712260341547
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.529057968205406,
+      "point": [
+        -2.3976198266837483,
+        2.1262426574657485,
+        0.8
+      ],
+      "overlap_m": 0.00979747200270964
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.5390518111348532,
+      "point": [
+        -2.3946609788324986,
+        2.135788406014252,
+        0.8
+      ],
+      "overlap_m": 0.011989069578119405
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.5490456540643003,
+      "point": [
+        -2.3916091133973048,
+        2.1453048236576837,
+        0.8
+      ],
+      "overlap_m": 0.014050558005473779
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.5590394969937473,
+      "point": [
+        -2.38846178894199,
+        2.1547900939564815,
+        0.8
+      ],
+      "overlap_m": 0.015982650320581604
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.5690333399231944,
+      "point": [
+        -2.3852163526938317,
+        2.1642422404299797,
+        0.8
+      ],
+      "overlap_m": 0.017786448249488995
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.5790271828526417,
+      "point": [
+        -2.38186971029691,
+        2.1736590243118012,
+        0.8
+      ],
+      "overlap_m": 0.019463695485558652
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.5890210257820887,
+      "point": [
+        -2.378418943345906,
+        2.183038146060354,
+        0.8
+      ],
+      "overlap_m": 0.021016143761041772
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.5990148687115358,
+      "point": [
+        -2.37486126612269,
+        2.192377236894859,
+        0.8
+      ],
+      "overlap_m": 0.02244559650361838
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.6090087116409828,
+      "point": [
+        -2.371192747157644,
+        2.2016733456220763,
+        0.8
+      ],
+      "overlap_m": 0.02375527525935639
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.6190025545704299,
+      "point": [
+        -2.3674099672874855,
+        2.210923540710543,
+        0.8
+      ],
+      "overlap_m": 0.024948078098944948
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.6289963974998771,
+      "point": [
+        -2.363510223977893,
+        2.2201250266199857,
+        0.8
+      ],
+      "overlap_m": 0.02602634439036522
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.6389902404293242,
+      "point": [
+        -2.359490417716077,
+        2.229274694968423,
+        0.8
+      ],
+      "overlap_m": 0.026993045828749562
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.6489840833587712,
+      "point": [
+        -2.3553464670984696,
+        2.2383688111672972,
+        0.8
+      ],
+      "overlap_m": 0.02785244727771463
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.6589779262882183,
+      "point": [
+        -2.3510744800614374,
+        2.2474034796145492,
+        0.8
+      ],
+      "overlap_m": 0.028608855158254565
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.6689717692176655,
+      "point": [
+        -2.3466716169281723,
+        2.256375080547103,
+        0.8
+      ],
+      "overlap_m": 0.029265651614671262
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.6789656121471126,
+      "point": [
+        -2.3421354589190266,
+        2.2652800282565764,
+        0.8
+      ],
+      "overlap_m": 0.029825962530037442
+    },
+    {
+      "object": "real_detail_m1_maze_divider_10_post1",
+      "arc_m": 1.6889594550765596,
+      "point": [
+        -2.337459741008678,
+        2.2741124918390803,
+        0.8
+      ],
+      "overlap_m": 0.030297487472677742
+    }
+  ],
+  "scope": "Photo-reconstructed mesh/box geometry; level drone radius .32 plus .01 margin plus .005 sampling allowance plus additional_xyz_error_margin_m. Floor and cage net omitted. Not flight validation or proof of bounded tracking/localization error.",
+  "closest_tested_triangle": [
+    -0.06904696132329463,
+    "real_detail_m2_maze_divider_25_rear_stay"
+  ]
+}

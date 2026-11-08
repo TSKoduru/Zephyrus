@@ -1,8 +1,8 @@
 # skybeta
 
-**CURRENT DEFAULT: UP 35 cm → FORWARD 10 cm → DOWN, odometry only, stereo map recorded.**
+**CURRENT DEFAULT: read-only WALK TEST with live ASCII particles in the launch logs.**
 Run `ros2 launch competitor_example competitor.launch.py`.
-See [initial test setup and logs](docs/odom_10cm_test.md) before running.
+See [walk test and before-tunnel route](docs/walk_and_before_tunnel.md).
 
 
 A GPS-denied autonomy stack for a Jetson Orin Nano paired with a Pixhawk 6C, shipped as

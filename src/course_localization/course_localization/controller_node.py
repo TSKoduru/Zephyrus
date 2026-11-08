@@ -21,6 +21,7 @@ from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
 from .controller import TimedPath, CourseFollower
+from .landing_finish import LandingFinish
 from .sensor_geometry import interpolate_pose
 
 
@@ -36,13 +37,15 @@ class CourseController(Node):
                         max_xy_std_m=.25, max_z_std_m=.25, max_yaw_std_rad=.35,
                         max_odom_gap_s=.1, max_speed_mps=.3, max_acceleration_mps2=.8,
                         max_yaw_rate_rps=.6, max_position_error_m=.25, publish_rate_hz=20.,
-                        require_range=True, require_imu=True, px4_clock_offset_s=0.)
+                        require_range=True, require_imu=True, px4_clock_offset_s=0., land_at_end=False)
         for key, value in defaults.items():
             self.declare_parameter(key, value)
         self.settings = {key: self.get_parameter(key).value for key in defaults}
         for key, value in self.settings.items():
             if isinstance(value, float) and (not np.isfinite(value) or (key != 'px4_clock_offset_s' and value <= 0)):
                 raise ValueError(f'{key} must be positive and finite')
+        if self.settings['max_speed_mps'] > .3048:
+            raise ValueError('Commanded speed must not exceed 1 ft/s (0.3048 m/s)')
         path = self.settings['trajectory_path'] or str(Path(get_package_share_directory('course_localization')) / 'trajectory' / 'course.npz')
         self.path = TimedPath.load(path, max_speed=self.settings['max_speed_mps'])
         self.follower = CourseFollower(self.path, max_speed=self.settings['max_speed_mps'],
@@ -50,6 +53,8 @@ class CourseController(Node):
             max_yaw_rate=self.settings['max_yaw_rate_rps'],
             max_position_error=self.settings['max_position_error_m'],
             max_measurement_age=self.settings['max_pose_age_s'])
+        self.landing = LandingFinish(self.path.position[-1], self.settings['max_speed_mps'])
+        self.completed = False
         self.twist_pub = self.create_publisher(TwistStamped, '/skybeta/setpoint/twist', 10)
         self.status_pub = self.create_publisher(String, '/course/controller_status', 10)
         self.hold_client = self.create_client(Trigger, '/skybeta/hold')
@@ -129,6 +134,7 @@ class CourseController(Node):
         if self.flight.get('armed') is True and data['armed'] is False:
             self.active = self.locked = self.ever_offboard = False
             self.fault = ''
+            self.landing = LandingFinish(self.path.position[-1], self.settings['max_speed_mps'])
             self.hold_needed = False
             self.follower.reset(self.get_clock().now().nanoseconds * 1e-9)
         if self.ever_offboard and not data['offboard_active']:
@@ -194,6 +200,10 @@ class CourseController(Node):
         now = self.get_clock().now().nanoseconds * 1e-9
         dt, self.last_tick = mono-self.last_tick, mono
         gates, output = [], {}
+        if self.completed:
+            self.request_hold(mono)
+            self.status_pub.publish(String(data=json.dumps(dict(status='landed', active=False))))
+            return
         enabled = self.get_parameter('enable_control').value is True
         if not enabled:
             gates.append('control disabled')
@@ -236,7 +246,17 @@ class CourseController(Node):
                 if output['stop_requested']:
                     self.fail(output.get('fault') or output.get('status', 'controller stopped'))
                 else:
-                    self.publish_twist(output['velocity_enu'], output['yaw_rate'])
+                    state, velocity = ('following', output['velocity_enu'])
+                    if self.settings['land_at_end']:
+                        state, velocity = self.landing.update(now, pose, output['reference_position'],
+                            self.flight.get('landed'), output['velocity_enu'])
+                    if state == 'landing_fault':
+                        self.fail('Touchdown timeout, lateral drift or height inconsistency; pilot landing required')
+                    elif state == 'landed':
+                        self.completed, self.active, self.hold_needed = True, False, True
+                    else:
+                        self.publish_twist(velocity, 0. if state == 'landing' else output['yaw_rate'])
+                    output.update(landing_state=state, velocity_enu=np.asarray(velocity).tolist())
             else:
                 # No pose prime: interface HOLD must not retain a startup pose.
                 self.publish_twist([0., 0., 0.], 0.)

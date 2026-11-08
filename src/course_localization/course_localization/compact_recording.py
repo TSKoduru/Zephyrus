@@ -52,6 +52,7 @@ class RollingText:
 
 class CompactRecorder(RunRecorder):
     def __init__(self, root, **kwargs):
+        self.cloud_frame = (kwargs.get('metadata') or {}).get('cloud_frame', 'odom')
         self.preview_time = -float('inf')
         self.previews = deque()
         self.snapshots = deque()
@@ -71,8 +72,8 @@ class CompactRecorder(RunRecorder):
     def event(self, topic, value):
         line = _json(dict(unix_ns=time.time_ns(), topic=topic, data=value)) + '\n'
         self.events.write(line)
-        if topic == '/odom_test/mission_status':
-            key = _json({k:value.get(k) for k in ('stage', 'fault', 'gates', 'enabled')})
+        if topic in ('/odom_test/mission_status','/course/controller_status'):
+            key = _json({k:value.get(k) for k in ('stage', 'status', 'landing_state', 'fault', 'gates', 'enabled')})
             if key != self.last_transition:
                 self.transitions.write(line)
                 self.last_transition = key
@@ -129,7 +130,7 @@ class CompactRecorder(RunRecorder):
                 continue
             xyz = np.array([total/count for total,count in cloud.values()], dtype='<f4').reshape(-1,3)
             path = self.path / 'snapshots' / f'{index:06d}_{name}.ply'
-            header = ('ply\nformat binary_little_endian 1.0\ncomment frame odom; measured stereo, cuVSLAM alignment\n'
+            header = (f'ply\nformat binary_little_endian 1.0\ncomment frame {self.cloud_frame}; alignment {name}; measured stereo\n'
                       f'element vertex {len(xyz)}\nproperty float x\nproperty float y\nproperty float z\nend_header\n').encode()
             _atomic(path, lambda f: f.write(header + xyz.tobytes()))
             paths.append(path)

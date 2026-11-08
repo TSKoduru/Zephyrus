@@ -21,6 +21,7 @@ from .filter_session import FilterSession
 from .inputs import Inputs
 from .raw_bag import RawBag
 from .recording import RunRecorder
+from .compact_recording import CompactRecorder
 
 
 DEFAULTS = {
@@ -40,7 +41,7 @@ DEFAULTS = {
     'range_fov_deg': 1.0, 'range_variance_m2': 0.0005,
     'range_max_age_s': 0.10, 'px4_time_offset_s': 0.0,
     'log_root': '~/team_ws/logs/course', 'record_raw_topics': True,
-    'config_file': '',
+    'config_file': '', 'compact_logs': False, 'ascii_live': False,
 }
 
 
@@ -75,9 +76,11 @@ class CourseLocalization(Node):
                       for p in Path(__file__).parent.rglob('*.py')})
         if self.config['config_file']:
             files['parameters.yaml'] = Path(self.config['config_file'])
-        self.recorder = RunRecorder(
+        recorder_type = CompactRecorder if self.config['compact_logs'] else RunRecorder
+        self.recorder = recorder_type(
             Path(self.config['log_root']).expanduser(), metadata={'parameters': self.config,
                 'purpose': 'Measured hardware localization, not simulated ground truth',
+                'cloud_frame': self.config['map_frame'],
                 'python_version': sys.version, 'numpy_version': np.__version__,
                 'ros_distro': os.environ.get('ROS_DISTRO', 'unknown'),
                 'range_mount_note': 'Configured body offset must match the physical mount',
@@ -97,7 +100,12 @@ class CourseLocalization(Node):
                        '/course/nominal_map', '/course/controller_status', '/skybeta/state',
                        '/fmu/out/vehicle_attitude',
                        '/skybeta/setpoint/pose', '/skybeta/setpoint/twist']
-            self.bag = RawBag(self.recorder.path, topics, self.config['record_raw_topics'])
+            self.bag = RawBag(self.recorder.path, topics,
+                              self.config['record_raw_topics'] and not self.config['compact_logs'])
+            if self.config['compact_logs']:
+                self.event_subscriptions = [self.create_subscription(String, topic,
+                    lambda msg, topic=topic: self.recorder.event(topic, json.loads(msg.data)), 10)
+                    for topic in ('/course/controller_status','/skybeta/state','/course/status')]
         except Exception:
             self.recorder.close()
             raise
@@ -117,6 +125,12 @@ class CourseLocalization(Node):
         self.frame_count = 0
         self.last_frame_time = None
         self.last_error = 'waiting_for_calibrated_stereo_and_odometry'
+        self.live_view = None
+        if self.config['ascii_live']:
+            from .ascii_view import LiveLogView
+            self.live_view = LiveLogView(map_directory)
+            self.create_timer(.5, lambda: self.get_logger().info(self.live_view.text(
+                self.get_clock().now().nanoseconds*1e-9, self.last_error)))
         self.create_timer(0.02, self.process)
         self.create_timer(1.0, self.status)
         self.get_logger().info(f'Logging to {self.recorder.path}; localization only, no flight commands')
@@ -133,6 +147,9 @@ class CourseLocalization(Node):
             )
             points = depth_points(frame)
             arrays.update(raw)
+            if self.config['compact_logs']:
+                for key in ('left_image','right_image','imu_samples','odom_samples','range_samples'):
+                    arrays.pop(key, None)
             arrays['processing_ros_time'] = self.get_clock().now().nanoseconds * 1e-9
             diagnostics.update(stereo=self.inputs.estimator.last_diagnostics,
                                synchronization_wait_s=wait, dropped_pairs=self.inputs.dropped_pairs,
@@ -164,6 +181,8 @@ class CourseLocalization(Node):
         covariance[3, 3] = covariance[4, 4] = np.deg2rad(5)**2
         output.pose.covariance = covariance.ravel().tolist()
         self.pose_pub.publish(output)
+        if self.live_view is not None:
+            self.live_view.update(state['pose'], self.session.pf.particles, frame.timestamp)
         poses = PoseArray(header=header)
         for x, y, z, yaw in self.session.pf.particles:
             pose = Pose()

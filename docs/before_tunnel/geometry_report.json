@@ -1,0 +1,24 @@
+{
+  "source_sha256": "46293c05975e77ff4bee9649b26bf4084f3446d1f2979c7afc9fe97eec4e819f",
+  "endpoint": [
+    2.0,
+    1.7,
+    0.116
+  ],
+  "join_original_time_s": 16.00030716264842,
+  "duration_s": 53.07090726835055,
+  "distance_m": 8.514754175888928,
+  "max_reference_speed_mps": 0.2499999999999556,
+  "tunnel_front_y": 1.219,
+  "endpoint_front_clearance_m": 0.14599999999999985,
+  "sampled_envelope_radius_m": 0.335,
+  "additional_xyz_error_margin_m": 0.0,
+  "trajectory_sha256": "dad7ff267e1202209074911210f982890ecfab3e6040b48d01300aa720f01a46",
+  "overlap_count": 0,
+  "contacts": [],
+  "scope": "Photo-reconstructed mesh/box geometry; level drone radius .32 plus .01 margin plus .005 sampling allowance plus additional_xyz_error_margin_m. Floor and cage net omitted. Not flight validation or proof of bounded tracking/localization error.",
+  "closest_tested_triangle": [
+    0.053255907078106235,
+    "real_detail_m2_maze_divider_25_rear_stay"
+  ]
+}

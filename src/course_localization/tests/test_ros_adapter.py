@@ -9,6 +9,12 @@ import numpy as np
 @unittest.skipUnless(os.environ.get('COURSE_ROS_INTEGRATION'), 'Requires built ROS package')
 class RosAdapterTest(unittest.TestCase):
     def test_calibrated_stereo_to_filter_to_recording(self):
+        self.run_pipeline(False)
+
+    def test_compact_walk_pipeline_and_inline_display(self):
+        self.run_pipeline(True)
+
+    def run_pipeline(self, compact):
         import rclpy
         import cv2
         from rclpy.time import Time
@@ -19,7 +25,8 @@ class RosAdapterTest(unittest.TestCase):
         from course_localization import node as module
         with tempfile.TemporaryDirectory() as logs:
             old = module.DEFAULTS.copy()
-            module.DEFAULTS.update(px4_range_topic='', record_raw_topics=False, log_root=logs)
+            module.DEFAULTS.update(px4_range_topic='', record_raw_topics=False, log_root=logs,
+                                   compact_logs=compact, ascii_live=compact)
             rclpy.init()
             node = module.CourseLocalization()
             try:
@@ -76,12 +83,20 @@ class RosAdapterTest(unittest.TestCase):
                 self.assertTrue(node.last_measurement['imu_valid'])
                 node.close()
                 files = list((node.recorder.path / 'frames').glob('*.npz'))
-                self.assertEqual(len(files), 1)
-                with np.load(files[0]) as result:
-                    self.assertTrue(np.isfinite(result['depth_m']).any())
-                    self.assertEqual(result['particles'].shape, (800, 4))
-                    self.assertIn('T_map_body_vo', result.files)
-                    self.assertIn('T_map_body_pf', result.files)
+                if compact:
+                    self.assertEqual(files, [])
+                    self.assertFalse((node.recorder.path/'rosbag').exists())
+                    self.assertTrue(list((node.recorder.path/'previews').glob('*depth_m.png')))
+                    self.assertIn('#',node.live_view.text(stamp))
+                    topics=node.get_publisher_names_and_types_by_node(node.get_name(),node.get_namespace())
+                    self.assertFalse(any(name.startswith(('/skybeta/','/fmu/in/')) for name,_ in topics))
+                else:
+                    self.assertEqual(len(files), 1)
+                    with np.load(files[0]) as result:
+                        self.assertTrue(np.isfinite(result['depth_m']).any())
+                        self.assertEqual(result['particles'].shape, (800, 4))
+                        self.assertIn('T_map_body_vo', result.files)
+                        self.assertIn('T_map_body_pf', result.files)
                 self.assertTrue(list((node.recorder.path / 'snapshots').glob('*_vo.ply')))
             finally:
                 node.close()

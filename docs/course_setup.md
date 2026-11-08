@@ -1,4 +1,4 @@
-> **Initial test:** the organizer default now runs the [odometry-only 10 cm test](odom_10cm_test.md). The full-course instructions below are separate.
+> **Current default:** the organizer launch now runs the [read-only walk test](walk_and_before_tunnel.md), with ASCII particles in its live output. The flight instructions below are separate.
 
 # Course setup, startup, self-test and RViz
 

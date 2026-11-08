@@ -1,0 +1,32 @@
+ILLUSTRATION ONLY: synthetic particles, not flight data
+
+WALK LOCALIZATION: LIVE
+x=-2.51 y=+0.91 z=0.12 m yaw=+50 deg
+# estimate | . particles (800, 0 outside) | walls: - | / \
+Map +Y up / +X right; nominal walls at z=0.80 m
++-------------------------------------------------------------+
+|                      /                                      |
+|                      /                                      |
+|                      /                                      |
+|           |          /         |                            |
+|           /          /         /                            |
+|           |          |         |                            |
+|   ......  /                    /                            |
+|  ....#..../                    /                            |
+| ........../                    /                            |
+|-/-/...../-|-/------------/-/-/-|--/-/--/-/-|                |
+|                    /                      /|                |
+|                    |                     /-                 |
+|                    /          |         /|                  |
+|                    |         /-        /-                   |
+|                             /|        -|                    |
+|                            //                               |
+|                           //                                |
+|                          /|                                 |
+|                                                             |
+|                                                             |
+|                       /-                                    |
+|                      -/                                     |
+|                                                             |
++-------------------------------------------------------------+
+Frame age 0.0s | Display is read-only; spread is not proof of accuracy

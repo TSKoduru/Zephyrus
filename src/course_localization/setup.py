@@ -18,5 +18,6 @@ setup(
     entry_points={'console_scripts': ['localize = course_localization.node:main',
                                            'follow_course = course_localization.controller_node:main',
                                            'odom_10cm_test = course_localization.odom_10cm_test:main',
-                                           'stereo_map_only = course_localization.stereo_map_node:main']},
+                                           'stereo_map_only = course_localization.stereo_map_node:main',
+                                           'ascii_view = course_localization.ascii_view:main']},
 )

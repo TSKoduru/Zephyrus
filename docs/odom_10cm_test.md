@@ -1,10 +1,10 @@
-# CURRENT DEFAULT — initial odometry-only 10 cm flight test
+# Separate initial odometry-only 10 cm flight test
 
 ```bash
-ros2 launch competitor_example competitor.launch.py
+ros2 launch competitor_example odom_10cm.launch.py
 ```
 
-This is also the default used by `run_competitor.sh` and `run_full_stack.sh`.
+The organizer default is now the read-only walk test. This flight launch is explicit.
 It launches the flight interface, stereo map recorder, and **only** the initial test.
 **UP 35 cm, hold, FORWARD 10 cm, hold, DOWN at 8 cm/s until PX4 reports landed.**
 Forward follows the drone's starting heading; start on the ground facing clear space.
